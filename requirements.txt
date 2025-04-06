@@ -1,0 +1,4 @@
+currencyconverter
+streamlit
+SQLAlchemy
+emoji
