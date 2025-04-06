@@ -1,4 +1,5 @@
 currencyconverter
 streamlit
-SQLAlchemy
+sqlalchemy
 emoji
+pyicloud
