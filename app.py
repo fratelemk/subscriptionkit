@@ -7,6 +7,9 @@ import streamlit as st
 from currency_converter import CurrencyConverter
 from pyicloud import PyiCloudService
 
+SALARY = 3500
+SALARY_CURRENCY = "RON"
+
 api = PyiCloudService(os.environ["APPLE_ID"], os.environ["PASSWORD"])
 if api.requires_2fa:
     print("Two-factor authentication required.")
@@ -38,6 +41,13 @@ def apply_conversion(row: pd.Series, new_currency):
 
     return f"{converted_rate:.2f} {new_currency}"
 
+def calculate_remaining(amount, currency):
+    if currency == SALARY_CURRENCY:
+        return f"{(SALARY - amount):.2f} {currency}"
+
+    converted_salary = currency_converter.convert(SALARY, SALARY_CURRENCY, currency)
+
+    return f"{(converted_salary - amount):.2f} {currency}"
 
 if file:
     with file.open(stream=True) as response:
@@ -51,5 +61,7 @@ if file:
 
         total = df['Amount'].apply(lambda x: float(x.removesuffix(currency_value).strip())).sum()
 
-    st.dataframe(df)
-    st.metric(label="Total", value=f"{total:.2f} {currency_value}")
+    st.dataframe(df, hide_index=True)
+    col1, col2 = st.columns(2)
+    col1.metric(label="Costs", value=f"{total:.2f} {currency_value}")
+    col2.metric(label="Remaining", value=calculate_remaining(total, currency_value))
