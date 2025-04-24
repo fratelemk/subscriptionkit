@@ -1,47 +1,33 @@
 import os
-import sys
-import re
-import emoji
 import pandas as pd
 import streamlit as st
 from currency_converter import CurrencyConverter
-from pyicloud import PyiCloudService
 
-SALARY = 3500
-SALARY_CURRENCY = "RON"
+st.set_page_config(page_title="SubscriptionKit", layout="wide")
 
-api = PyiCloudService(os.environ["APPLE_ID"], os.environ["PASSWORD"])
-if api.requires_2fa:
-    print("Two-factor authentication required.")
-    code = input("Enter the code you received of one of your approved devices: ")
-    result = api.validate_2fa_code(code)
-    print("Code validation result: %s" % result)
+FILEPATH = "data.csv"
 
-    if not result:
-        print("Failed to verify security code")
-        sys.exit(1)
+SALARY = os.getenv("SALARY")
+SALARY_CURRENCY = os.getenv("SALARY_CURRENCY")
+DEFAULT_CURRENCY = os.getenv("DEFAULT_CURRENCY")
 
-    if not api.is_trusted_session:
-        print("Session is not trusted. Requesting trust...")
-        result = api.trust_session()
-        print("Session trust result %s" % result)
+CURRENCIES = ("USD", "GBP", "EUR", "RON")
 
-        if not result:
-            print("Failed to request trust. You will likely be prompted for the code again in the coming weeks")
 
-file = api.drive["Subscriptions.csv"]
+def apply_conversion(row: pd.Series, new_currency: str) -> str:
+    amount, currency = row["Amount"], row["Currency"]
 
-currency_converter = CurrencyConverter(verbose=False)
+    if new_currency == currency:
+        return f"{amount} {currency}"
 
-def apply_conversion(row: pd.Series, new_currency):
-    if new_currency == row['Currency']:
-        return f"{row['Amount']} {row['Currency']}"
+    converted_rate = round(
+        currency_converter.convert(amount, currency, new_currency), 2
+    )
 
-    converted_rate = currency_converter.convert(row['Amount'], row['Currency'], new_currency)
+    return f"{converted_rate} {new_currency}"
 
-    return f"{converted_rate:.2f} {new_currency}"
 
-def calculate_remaining(amount, currency):
+def calculate_remaining(amount: float, currency: str) -> str:
     if currency == SALARY_CURRENCY:
         return f"{(SALARY - amount):.2f} {currency}"
 
@@ -49,19 +35,47 @@ def calculate_remaining(amount, currency):
 
     return f"{(converted_salary - amount):.2f} {currency}"
 
-if file:
-    with file.open(stream=True) as response:
-        df = pd.read_csv(filepath_or_buffer=response.raw)
-        currency_options = ("🇺🇸USD", "🇬🇧GBP", "🇪🇺EUR", "🇷🇴RON")
-        currency = st.selectbox('Currency', currency_options)
-        currency_value = re.sub(r'\s+', '', emoji.replace_emoji(currency, replace=''))
 
-        df['Amount'] = df.apply(lambda row: apply_conversion(row, currency_value), axis=1)
-        df.drop("Currency", axis=1, inplace=True)
+form = st.form("_subscription", border=False)
 
-        total = df['Amount'].apply(lambda x: float(x.removesuffix(currency_value).strip())).sum()
+subscription = form.text_input("Subscription", "iCloud+")
+currency = form.selectbox("Currency", ["GBP", "USD", "EUR"])
+amount = form.number_input("Amount", min_value=0.00, format="%.2f")
 
-    st.dataframe(df, hide_index=True)
-    col1, col2 = st.columns(2)
-    col1.metric(label="Costs", value=f"{total:.2f} {currency_value}")
-    col2.metric(label="Remaining", value=calculate_remaining(total, currency_value))
+submit = form.form_submit_button("Add Subscription")
+
+if submit:
+    if subscription and currency and amount:
+        pd.DataFrame(
+            [[subscription, currency, amount]],
+            columns=["Subscription", "Currency", "Amount"],
+        ).to_csv(FILEPATH, mode="a", header=False, index=False)
+        st.success(f"Record added: {subscription}, {currency}, {amount}")
+    else:
+        st.error("Please fill in all fields.")
+
+
+st.divider()
+
+df = pd.read_csv(FILEPATH)
+
+
+currency_converter = CurrencyConverter(verbose=False)
+
+currency = st.selectbox(
+    "Currency", CURRENCIES, index=CURRENCIES.index(DEFAULT_CURRENCY)
+)
+
+df["Amount"] = df.apply(lambda row: apply_conversion(row, currency), axis=1)
+
+total = df["Amount"].apply(lambda x: float(x.removesuffix(currency).strip())).sum()
+
+
+st.dataframe(df, hide_index=True)
+
+st.subheader("Monthly Report")
+
+columns = st.columns(2)
+
+columns[0].metric(label="Costs", value=f"{total:.2f} {currency}")
+columns[1].metric(label="Remaining", value=calculate_remaining(total, currency))

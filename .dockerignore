@@ -1,0 +1,9 @@
+.git/
+.idea/
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+README.md
+.DS_Store
