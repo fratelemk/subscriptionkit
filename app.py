@@ -1,3 +1,4 @@
+import yaml
 import os
 import pandas as pd
 import streamlit as st
@@ -19,63 +20,90 @@ class Subscription(NamedTuple):
 st.set_page_config(page_title="SubscriptionKit", layout="wide")
 
 FILEPATH = "data.csv"
-SALARY = 3500
-SALARY_CURRENCY = "RON"
-DEFAULT_CURRENCY = "RON"
 CURRENCIES = ("USD", "GBP", "EUR", "RON")
 HEADER = [
     "Subscription",
     "Category",
     "Currency",
     "Amount",
-    "Billing Cycle",
     "Payment Method",
+    "Billing Cycle",
     "Active",
     "Notes",
 ]
+CONFIG_FILE = "config.yaml"
+
+
+def load_config():
+    """Initialize and cache the currency converter."""
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        return None
+
+
+@st.dialog("Budget Settings")
+def budget_settings_dialog():
+    budget = st.number_input(
+        "Budget",
+        min_value=0,
+        value=5000,
+    )
+    target_currency = st.selectbox("Target Currency", CURRENCIES)
+    default_currency = st.selectbox("Default Display Currency", CURRENCIES)
+
+    if st.button("Save Settings"):
+        new_config = {
+            "BUDGET": int(budget),
+            "BUDGET_CURRENCY": target_currency,
+            "DEFAULT_CURRENCY": default_currency,
+        }
+        save_config(new_config)
+        st.success("✅ Budget and currency settings saved!")
+        st.rerun()
+
+
+def save_config(config: dict):
+    """Save budget and currency settings to YAML."""
+    with open(CONFIG_FILE, "w") as f:
+        yaml.safe_dump(config, f)
 
 
 @st.dialog("Add Subscription")
 def add_subscription_dialog():
-    with st.form("add_subscription_form", border=False, clear_on_submit=True):
-        subscription_name = st.text_input(
-            "Subscription Name", placeholder="e.g., Netflix"
-        )
-        category = st.text_input("Category", placeholder="e.g., Entertainment")
-        currency = st.selectbox("Currency", CURRENCIES, index=1)
-        amount = st.number_input("Amount", min_value=0.01, format="%.2f", value=9.99)
-        billing_cycle = st.selectbox(
-            "Billing Cycle", ["Monthly", "Yearly", "Weekly"], index=0
-        )
-        payment_method = st.text_input(
-            "Payment Method", placeholder="Credit Card, PayPal..."
-        )
-        active = st.checkbox("Active", value=True)
-        notes = st.text_area("Notes (optional)")
+    subscription_name = st.text_input("Subscription Name", placeholder="e.g., Netflix")
+    category = st.text_input("Category", placeholder="e.g., Entertainment")
+    currency = st.selectbox("Currency", CURRENCIES, index=1)
+    amount = st.number_input("Amount", min_value=0.01, format="%.2f", value=9.99)
+    billing_cycle = st.selectbox(
+        "Billing Cycle", ["Monthly", "Yearly", "Weekly"], index=0
+    )
+    payment_method = st.text_input("Payment Method", placeholder="Credit Card, PayPal")
+    active = st.checkbox("Active", value=True)
+    notes = st.text_area("Notes (optional)")
 
-        submit = st.form_submit_button("Add Subscription")
+    if st.button("Add Subscription"):
+        sub = Subscription(
+            subscription=subscription_name.strip(),
+            category=category.strip(),
+            currency=currency,
+            amount=amount,
+            billing_cycle=billing_cycle,
+            payment_method=payment_method.strip(),
+            active=active,
+            notes=notes.strip(),
+        )
 
-        if submit:
-            sub = Subscription(
-                subscription=subscription_name.strip(),
-                category=category.strip(),
-                currency=currency,
-                amount=amount,
-                billing_cycle=billing_cycle,
-                payment_method=payment_method.strip(),
-                active=active,
-                notes=notes.strip(),
-            )
-
-            is_valid, error_message = validate_subscription_input(sub)
-            if is_valid:
-                if add_subscription(sub):
-                    st.success(
-                        f"✅ Added: {sub.subscription} - {sub.amount:.2f} {sub.currency}"
-                    )
-                    st.rerun()
-            else:
-                st.error(f"❌ {error_message}")
+        is_valid, error_message = validate_subscription_input(sub)
+        if is_valid:
+            if add_subscription(sub):
+                st.success(
+                    f"✅ Added: {sub.subscription} - {sub.amount:.2f} {sub.currency}"
+                )
+                st.rerun()
+        else:
+            st.error(f"❌ {error_message}")
 
 
 @st.dialog("Delete Subscription")
@@ -116,6 +144,7 @@ def get_currency_converter():
 
 
 currency_converter = get_currency_converter()
+config = load_config()
 
 
 def load_data():
@@ -167,11 +196,11 @@ def apply_conversion(row: pd.Series, target_currency: str) -> str:
 
 def calculate_remaining_salary(total_expenses: float, expense_currency: str) -> str:
     """Calculate remaining salary after expenses."""
-    if expense_currency == SALARY_CURRENCY:
-        remaining = SALARY - total_expenses
+    if expense_currency == config["BUDGET_CURRENCY"]:
+        remaining = config["BUDGET"] - total_expenses
     else:
         salary_in_expense_currency = convert_currency(
-            SALARY, SALARY_CURRENCY, expense_currency
+            config["BUDGET"], config["BUDGET_CURRENCY"], expense_currency
         )
         remaining = salary_in_expense_currency - total_expenses
 
@@ -238,7 +267,7 @@ def main():
             lambda row: f"{row['Amount']:.2f} {row['Currency']}", axis=1
         )
         df_display["Amount"] = df_display.apply(
-            lambda row: apply_conversion(row, DEFAULT_CURRENCY), axis=1
+            lambda row: apply_conversion(row, config["DEFAULT_CURRENCY"]), axis=1
         )
 
         total_amount = sum(
@@ -254,7 +283,9 @@ def main():
             column_config={
                 "Subscription": st.column_config.TextColumn("Service"),
                 "Amount (Original)": st.column_config.TextColumn("Original Amount"),
-                "Amount": st.column_config.TextColumn(f"Amount ({DEFAULT_CURRENCY})"),
+                "Amount": st.column_config.TextColumn(
+                    f'Amount ({config["DEFAULT_CURRENCY"]})'
+                ),
             },
         )
 
@@ -264,12 +295,14 @@ def main():
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric(
-                label="Monthly Costs",
-                value=f"{total_amount:.2f} {DEFAULT_CURRENCY}",
+                label="Expenses",
+                value=f'{total_amount:.2f} {config["DEFAULT_CURRENCY"]}',
             )
 
         with col2:
-            remaining = calculate_remaining_salary(total_amount, DEFAULT_CURRENCY)
+            remaining = calculate_remaining_salary(
+                total_amount, config["DEFAULT_CURRENCY"]
+            )
             remaining_value = float(remaining.split()[0])
             delta_color = "normal" if remaining_value >= 0 else "inverse"
             st.metric(
@@ -280,22 +313,29 @@ def main():
             if total_amount > 0:
                 percentage = (
                     total_amount
-                    / convert_currency(SALARY, SALARY_CURRENCY, DEFAULT_CURRENCY)
+                    / convert_currency(
+                        config["BUDGET"],
+                        config["BUDGET_CURRENCY"],
+                        config["DEFAULT_CURRENCY"],
+                    )
                 ) * 100
                 st.metric(label="% of Budget Used", value=f"{percentage:.1f}%")
 
         st.divider()
 
-    # 5️⃣ Buttons to open dialogs
-    col_add, col_delete = st.columns([1, 1])
+    col_add, col_delete, col_budget = st.columns([1, 1, 1])
 
     with col_add:
         if st.button("➕ Add Subscription"):
-            add_subscription_dialog()  # dialog function defined elsewhere
+            add_subscription_dialog()
 
     with col_delete:
         if not df.empty and st.button("🗑️ Manage Subscriptions"):
-            delete_subscription_dialog(df)  # dialog function defined elsewhere
+            delete_subscription_dialog(df)
+
+    with col_budget:
+        if st.button("⚙️ Budget Settings"):
+            budget_settings_dialog()
 
 
 if __name__ == "__main__":
