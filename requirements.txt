@@ -1,2 +1,3 @@
 currencyconverter
-streamlit
+streamlit[pdf,charts]
+fpdf2

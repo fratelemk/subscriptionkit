@@ -2,6 +2,18 @@ import os
 import pandas as pd
 import streamlit as st
 from currency_converter import CurrencyConverter
+from typing import NamedTuple
+
+
+class Subscription(NamedTuple):
+    subscription: str
+    category: str
+    currency: str
+    amount: float
+    payment_method: str
+    billing_cycle: str = "Monthly"
+    active: bool = True
+    notes: str = ""
 
 
 st.set_page_config(page_title="SubscriptionKit", layout="wide")
@@ -11,6 +23,85 @@ SALARY = 3500
 SALARY_CURRENCY = "RON"
 DEFAULT_CURRENCY = "RON"
 CURRENCIES = ("USD", "GBP", "EUR", "RON")
+HEADER = [
+    "Subscription",
+    "Category",
+    "Currency",
+    "Amount",
+    "Billing Cycle",
+    "Payment Method",
+    "Active",
+    "Notes",
+]
+
+
+@st.dialog("Add Subscription")
+def add_subscription_dialog():
+    with st.form("add_subscription_form", border=False, clear_on_submit=True):
+        subscription_name = st.text_input(
+            "Subscription Name", placeholder="e.g., Netflix"
+        )
+        category = st.text_input("Category", placeholder="e.g., Entertainment")
+        currency = st.selectbox("Currency", CURRENCIES, index=1)
+        amount = st.number_input("Amount", min_value=0.01, format="%.2f", value=9.99)
+        billing_cycle = st.selectbox(
+            "Billing Cycle", ["Monthly", "Yearly", "Weekly"], index=0
+        )
+        payment_method = st.text_input(
+            "Payment Method", placeholder="Credit Card, PayPal..."
+        )
+        active = st.checkbox("Active", value=True)
+        notes = st.text_area("Notes (optional)")
+
+        submit = st.form_submit_button("Add Subscription")
+
+        if submit:
+            sub = Subscription(
+                subscription=subscription_name.strip(),
+                category=category.strip(),
+                currency=currency,
+                amount=amount,
+                billing_cycle=billing_cycle,
+                payment_method=payment_method.strip(),
+                active=active,
+                notes=notes.strip(),
+            )
+
+            is_valid, error_message = validate_subscription_input(sub)
+            if is_valid:
+                if add_subscription(sub):
+                    st.success(
+                        f"✅ Added: {sub.subscription} - {sub.amount:.2f} {sub.currency}"
+                    )
+                    st.rerun()
+            else:
+                st.error(f"❌ {error_message}")
+
+
+@st.dialog("Delete Subscription")
+def delete_subscription_dialog(df: pd.DataFrame):
+    if df.empty:
+        st.info("No subscriptions to delete.")
+        return
+
+    subscription_to_delete = st.selectbox(
+        "Select subscription to delete:",
+        options=df.index,
+        format_func=lambda x: (
+            f"{df.iloc[x]['Subscription']} "
+            f"({df.iloc[x]['Category']}) - "
+            f"{df.iloc[x]['Amount']:.2f} {df.iloc[x]['Currency']}"
+        ),
+    )
+
+    if st.button("Delete Selected Subscription", type="secondary"):
+        try:
+            df_updated = df.drop(subscription_to_delete).reset_index(drop=True)
+            df_updated.to_csv(FILEPATH, index=False)
+            st.success("Subscription deleted successfully!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to delete subscription: {e}")
 
 
 @st.cache_resource
@@ -31,18 +122,18 @@ def load_data():
     """Load subscription data with error handling."""
 
     if not os.path.exists(FILEPATH):
-        df = pd.DataFrame(columns=["Subscription", "Currency", "Amount"])
+        df = pd.DataFrame(columns=HEADER)
         df.to_csv(FILEPATH, index=False)
         print(f"Created new data file: {FILEPATH}")
     try:
         df = pd.read_csv(FILEPATH)
         if df.empty:
-            return pd.DataFrame(columns=["Subscription", "Currency", "Amount"])
+            return pd.DataFrame(columns=HEADER)
         return df
     except Exception as e:
         print(f"Error loading data: {e}")
         st.error("Failed to load subscription data.")
-        return pd.DataFrame(columns=["Subscription", "Currency", "Amount"])
+        return pd.DataFrame(columns=HEADER)
 
 
 def convert_currency(amount: float, from_currency: str, to_currency: str) -> float:
@@ -87,15 +178,12 @@ def calculate_remaining_salary(total_expenses: float, expense_currency: str) -> 
     return f"{remaining:.2f} {expense_currency}"
 
 
-def add_subscription(subscription: str, currency: str, amount: float) -> bool:
-    """Add a new subscription to the CSV file."""
+def add_subscription(sub: Subscription) -> bool:
+    """Add a new subscription to the CSV file using a Subscription object."""
     try:
         new_record = pd.DataFrame(
-            [[subscription, currency, amount]],
-            columns=["Subscription", "Currency", "Amount"],
-        )
-
-        # Check if file has data to determine if we need headers
+            [sub._asdict()]
+        )  # convert NamedTuple to dict for DataFrame
         file_is_empty = not os.path.exists(FILEPATH) or os.path.getsize(FILEPATH) == 0
         new_record.to_csv(FILEPATH, mode="a", header=file_is_empty, index=False)
         return True
@@ -105,146 +193,109 @@ def add_subscription(subscription: str, currency: str, amount: float) -> bool:
         return False
 
 
-def validate_subscription_input(
-    subscription: str, currency: str, amount: float
-) -> tuple[bool, str]:
-    """Validate user input for new subscription."""
-    if not subscription or not subscription.strip():
+def validate_subscription_input(sub: Subscription) -> tuple[bool, str]:
+    """Validate a Subscription object before adding it."""
+
+    if not sub.subscription.strip():
         return False, "Subscription name cannot be empty."
 
-    if not currency:
+    if not sub.category.strip():
+        return False, "Category cannot be empty."
+
+    if not sub.currency.strip():
         return False, "Please select a currency."
 
-    if amount <= 0:
+    if sub.amount <= 0:
         return False, "Amount must be greater than 0."
+
+    if not sub.billing_cycle.strip():
+        return False, "Billing cycle cannot be empty."
+
+    if not sub.payment_method.strip():
+        return False, "Payment method cannot be empty."
 
     return True, ""
 
 
 def main():
     st.title("💳 SubscriptionKit")
-    st.write("Track your monthly subscriptions and manage your budget.")
 
     if not currency_converter:
         st.stop()
 
-    # Add new subscription section
-    with st.expander("➕ Add New Subscription", expanded=False):
-        with st.form("add_subscription_form", border=False, clear_on_submit=True):
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                subscription = st.text_input(
-                    "Subscription Name", placeholder="e.g., Netflix, Spotify"
-                )
-
-            with col2:
-                currency = st.selectbox(
-                    "Currency", CURRENCIES, index=1
-                )  # Default to GBP
-
-            with col3:
-                amount = st.number_input(
-                    "Monthly Amount", min_value=0.01, format="%.2f", value=9.99
-                )
-
-            submit = st.form_submit_button("Add Subscription")
-
-            if submit:
-                is_valid, error_message = validate_subscription_input(
-                    subscription, currency, amount
-                )
-
-                if is_valid:
-                    if add_subscription(subscription.strip(), currency, amount):
-                        st.success(
-                            f"✅ Added: {subscription} - {amount:.2f} {currency}"
-                        )
-                        st.rerun()
-                else:
-                    st.error(f"❌ {error_message}")
-
-    st.divider()
-
-    # Load and display data
     df = load_data()
 
+    # 1️⃣ Display info if no subscriptions exist
     if df.empty:
-        st.info("No subscriptions found. Add your first subscription above!")
-        return
-
-    # Convert amounts for display
-    df_display = df.copy()
-    df_display["Amount (Original)"] = df_display.apply(
-        lambda row: f"{row['Amount']:.2f} {row['Currency']}", axis=1
-    )
-    df_display["Amount"] = df_display.apply(
-        lambda row: apply_conversion(row, DEFAULT_CURRENCY), axis=1
-    )
-
-    # Calculate total
-    total_amount = sum(
-        float(amount_str.split()[0]) for amount_str in df_display["Amount"]
-    )
-
-    # Display dataframe
-    st.subheader("📊 Your Subscriptions")
-
-    # Reorder columns for better display
-    display_columns = ["Subscription", "Amount (Original)", "Amount"]
-    st.dataframe(
-        df_display[display_columns],
-        hide_index=True,
-        width="stretch",
-        column_config={
-            "Subscription": st.column_config.TextColumn("Service"),
-            "Amount (Original)": st.column_config.TextColumn("Original Amount"),
-            "Amount": st.column_config.TextColumn(f"Amount ({DEFAULT_CURRENCY})"),
-        },
-    )
-
-    st.divider()
-
-    st.subheader("📈 Monthly Report")
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            label="Total Monthly Costs", value=f"{total_amount:.2f} {DEFAULT_CURRENCY}"
+        st.info(
+            "No subscriptions found. Add your first subscription using the 'Add Subscription' button below!"
         )
 
-    with col2:
-        remaining = calculate_remaining_salary(total_amount, DEFAULT_CURRENCY)
-        remaining_value = float(remaining.split()[0])
-        delta_color = "normal" if remaining_value >= 0 else "inverse"
-        st.metric(label="Remaining Salary", value=remaining)
+    else:
+        # 2️⃣ Prepare dataframe for display
+        df_display = df.copy()
+        df_display["Amount (Original)"] = df_display.apply(
+            lambda row: f"{row['Amount']:.2f} {row['Currency']}", axis=1
+        )
+        df_display["Amount"] = df_display.apply(
+            lambda row: apply_conversion(row, DEFAULT_CURRENCY), axis=1
+        )
 
-    with col3:
-        if total_amount > 0:
-            percentage = (
-                total_amount
-                / convert_currency(SALARY, SALARY_CURRENCY, DEFAULT_CURRENCY)
-            ) * 100
-            st.metric(label="% of Salary Used", value=f"{percentage:.1f}%")
+        total_amount = sum(
+            float(amount_str.split()[0]) for amount_str in df_display["Amount"]
+        )
 
-    st.divider()
+        # 3️⃣ Display dataframe
+        _left, _right = st.columns(2)
+        _left.dataframe(
+            df_display,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "Subscription": st.column_config.TextColumn("Service"),
+                "Amount (Original)": st.column_config.TextColumn("Original Amount"),
+                "Amount": st.column_config.TextColumn(f"Amount ({DEFAULT_CURRENCY})"),
+            },
+        )
 
-    if len(df) > 0:
-        with st.expander("🗑️ Manage Subscriptions"):
-            subscription_to_delete = st.selectbox(
-                "Select subscription to delete:",
-                options=df.index,
-                format_func=lambda x: f"{df.iloc[x]['Subscription']} - {df.iloc[x]['Amount']:.2f} {df.iloc[x]['Currency']}",
+        st.divider()
+
+        # 4️⃣ Metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(
+                label="Monthly Costs",
+                value=f"{total_amount:.2f} {DEFAULT_CURRENCY}",
             )
 
-            if st.button("Delete Selected Subscription", type="secondary"):
-                try:
-                    df_updated = df.drop(subscription_to_delete).reset_index(drop=True)
-                    df_updated.to_csv(FILEPATH, index=False)
-                    st.success("Subscription deleted successfully!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed to delete subscription: {e}")
+        with col2:
+            remaining = calculate_remaining_salary(total_amount, DEFAULT_CURRENCY)
+            remaining_value = float(remaining.split()[0])
+            delta_color = "normal" if remaining_value >= 0 else "inverse"
+            st.metric(
+                label="Remaining Budget", value=remaining, delta_color=delta_color
+            )
+
+        with col3:
+            if total_amount > 0:
+                percentage = (
+                    total_amount
+                    / convert_currency(SALARY, SALARY_CURRENCY, DEFAULT_CURRENCY)
+                ) * 100
+                st.metric(label="% of Budget Used", value=f"{percentage:.1f}%")
+
+        st.divider()
+
+    # 5️⃣ Buttons to open dialogs
+    col_add, col_delete = st.columns([1, 1])
+
+    with col_add:
+        if st.button("➕ Add Subscription"):
+            add_subscription_dialog()  # dialog function defined elsewhere
+
+    with col_delete:
+        if not df.empty and st.button("🗑️ Manage Subscriptions"):
+            delete_subscription_dialog(df)  # dialog function defined elsewhere
 
 
 if __name__ == "__main__":
