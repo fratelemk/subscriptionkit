@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 from currency_converter import CurrencyConverter
 from typing import NamedTuple
+import plotly.express as px
 
 
 class Subscription(NamedTuple):
@@ -32,6 +33,46 @@ HEADER = [
     "Notes",
 ]
 CONFIG_FILE = "config.yaml"
+
+
+def plot_expenses_by_category(df: pd.DataFrame, currency):
+    if df.empty:
+        st.info("No subscriptions to visualize.")
+        return
+
+    # Only consider active subscriptions
+    df_active = df[df["Active"] == True].copy()
+    if df_active.empty:
+        st.info("No active subscriptions to visualize.")
+        return
+
+    # Convert amounts to target currency
+    df_active["Amount_converted"] = df_active.apply(
+        lambda row: float(apply_conversion(row, currency).split()[0]), axis=1
+    )
+
+    # Aggregate by category
+    df_grouped = df_active.groupby("Category")["Amount_converted"].sum().reset_index()
+
+    # Create pie chart
+    fig = px.pie(
+        df_grouped,
+        names="Category",
+        values="Amount_converted",
+        title=f"Expenses by Category ({currency})",
+        color="Category",
+        color_discrete_sequence=px.colors.qualitative.Pastel,  # nice soft colors
+        hole=0.4,  # donut chart
+    )
+
+    fig.update_traces(
+        textposition="inside",
+        textinfo="percent+label",
+        hovertemplate="%{label}: %{value:.2f} " + currency,
+        marker=dict(line=dict(color="#ffffff", width=2)),  # white borders
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def load_config():
@@ -106,27 +147,43 @@ def add_subscription_dialog():
             st.error(f"❌ {error_message}")
 
 
-@st.dialog("Delete Subscription")
-def delete_subscription_dialog(df: pd.DataFrame):
+@st.dialog("Manage Subscriptions")
+def manage_subscriptions_dialog(df: pd.DataFrame):
     if df.empty:
-        st.info("No subscriptions to delete.")
+        st.info("No subscriptions available.")
         return
 
-    subscription_to_delete = st.selectbox(
-        "Select subscription to delete:",
+    # Select subscription
+    idx = st.selectbox(
+        "Select subscription:",
         options=df.index,
         format_func=lambda x: (
-            f"{df.iloc[x]['Subscription']} "
-            f"({df.iloc[x]['Category']}) - "
-            f"{df.iloc[x]['Amount']:.2f} {df.iloc[x]['Currency']}"
+            f"{df.iloc[x]['Subscription']} ({df.iloc[x]['Category']}) - "
+            f"{df.iloc[x]['Amount']:.2f} {df.iloc[x]['Currency']} - "
+            f"{'Active' if df.iloc[x]['Active'] else 'Inactive'}"
         ),
     )
 
-    if st.button("Delete Selected Subscription", type="secondary"):
+    subscription = df.loc[idx]
+
+    # Toggle Active state
+    active_state = st.checkbox("Active", value=bool(subscription["Active"]))
+
+    if st.button("Update Status", type="secondary"):
         try:
-            df_updated = df.drop(subscription_to_delete).reset_index(drop=True)
+            df.at[idx, "Active"] = active_state
+            df.to_csv(FILEPATH, index=False)
+            st.success(f"✅ Updated '{subscription['Subscription']}' active status.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Failed to update subscription: {e}")
+
+    # Optional: Delete subscription
+    if st.button("🗑️ Delete Subscription", type="secondary"):
+        try:
+            df_updated = df.drop(idx).reset_index(drop=True)
             df_updated.to_csv(FILEPATH, index=False)
-            st.success("Subscription deleted successfully!")
+            st.success(f"✅ Deleted '{subscription['Subscription']}'.")
             st.rerun()
         except Exception as e:
             st.error(f"Failed to delete subscription: {e}")
@@ -247,8 +304,6 @@ def validate_subscription_input(sub: Subscription) -> tuple[bool, str]:
 
 
 def main():
-    st.title("💳 SubscriptionKit")
-
     if not currency_converter:
         st.stop()
 
@@ -275,8 +330,7 @@ def main():
         )
 
         # 3️⃣ Display dataframe
-        _left, _right = st.columns(2)
-        _left.dataframe(
+        st.dataframe(
             df_display,
             hide_index=True,
             width="stretch",
@@ -322,6 +376,7 @@ def main():
                 st.metric(label="% of Budget Used", value=f"{percentage:.1f}%")
 
         st.divider()
+        plot_expenses_by_category(df, config["DEFAULT_CURRENCY"])
 
     col_add, col_delete, col_budget = st.columns([1, 1, 1])
 
@@ -331,7 +386,7 @@ def main():
 
     with col_delete:
         if not df.empty and st.button("🗑️ Manage Subscriptions"):
-            delete_subscription_dialog(df)
+            manage_subscriptions_dialog(df)
 
     with col_budget:
         if st.button("⚙️ Budget Settings"):
