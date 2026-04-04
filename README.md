@@ -2,9 +2,9 @@
 
 A [Streamlit](https://github.com/streamlit/streamlit) application that allows you to track, convert, and manage your monthly subscriptions across multiple currencies while monitoring your budget and remaining salary.
 
-The datastore used is a simple CSV file that currently has the following structure:
+The datastore used is a simple CSV file that currently has the following header:
 
-`Subscription,Currency,Amount`
+`Service,Category,Currency,Amount,Payment Method,Active,Notes`
 
 This simple file-based approach offers several advantages:
 
@@ -20,7 +20,7 @@ This simple file-based approach offers several advantages:
 - [X] ~~iCloud Integration~~
 - [ ] Backup
 - [ ] Categorisation
-- [ ] PDF Report Generation
+- [X] ~~PDF Report Generation~~
 
 ---
 
@@ -43,4 +43,4 @@ streamlit run app.py
 ```
 
 > [!NOTE]
-> A Docker image is also available, created according to the official [Streamlit's Docker Deployment Guide](https://docs.streamlit.io/deploy/tutorials/docker).
+> A Docker image is also available, created according to the official [Streamlit Docker Deployment Guide](https://docs.streamlit.io/deploy/tutorials/docker).
