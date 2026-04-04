@@ -1,100 +1,163 @@
-from pandas import DataFrame
-from fpdf import FPDF, XPos, YPos
-from datetime import datetime
-from typing import ClassVar, Dict, List, Literal, NamedTuple
+from pandas import isna, read_csv, DataFrame, Series
+from datetime import datetime, date
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
-CurrencyCode = Literal["GBP", "USD", "EUR", "RON"]
+COLUMNS = [
+    ("Service", 38),
+    ("Category", 30),
+    ("Currency", 20),
+    ("Amount", 22),
+    ("Payment Method", 38),
+    ("Notes", 38),
+]
 
-
-class Font(NamedTuple):
-    style: str
-    size: int
-    family: str = "Helvetica"
-
-
-class Fonts:
-    TITLE = Font("B", 16)
-    HEADER = Font("B", 12)
-    BODY = Font("", 12)
-    FOOTER = Font("I", 8)
+TABLE_WIDTH = sum(w for _, w in COLUMNS)
+TEMPLATED_FILE_NAME = "data/reports/subscriptions_{date:%m_%d_%Y}_RON.pdf"
 
 
-class PDF(FPDF):
-    def footer(self) -> None:
-        self.set_y(-15)
-        self.set_font(*Fonts.FOOTER)
-        footer_text = f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Disclaimer: This report was automatically generated."
-        self.cell(0, 5, footer_text, align="L")
+class Report(FPDF):
+    def __init__(self):
+        super().__init__(orientation="L", unit="mm", format="A4")
+        self.set_margins(12, 12, 12)
+        self.set_auto_page_break(auto=True, margin=18)
 
+    def header(self):
+        self.set_xy(self.l_margin, 8)
+        self.set_font("Helvetica", "B", 20)
+        self.set_text_color(0, 0, 0)
+        self.cell(0, 10, "Monthly Report", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-class MonthlyReports:
-    month: ClassVar[str] = datetime.now().strftime("%B %Y")  # e.g. September 2025
-    orientation: ClassVar[Literal["L", "P"]] = "P"
-    format: ClassVar[Literal["A4", "A5"]] = "A5"
-    currency_symbols: ClassVar[Dict[CurrencyCode, str]] = dict(
-        GBP="£", USD="$", EUR="€", RON="RON"
-    )
-    _instances: ClassVar[List["MonthlyReports"]] = []
-
-    def __init__(self, data: DataFrame) -> None:
-        pdf = PDF()
-        pdf.alias_nb_pages()
-        pdf.add_page(
-            orientation=MonthlyReports.orientation, format=MonthlyReports.format
+        self.set_x(self.l_margin)
+        self.set_font("Helvetica", "", 10)
+        self.set_text_color(80, 80, 80)
+        self.cell(
+            0, 6, datetime.now().strftime("%B %Y"), new_x=XPos.LMARGIN, new_y=YPos.NEXT
         )
 
-        # Title
-        pdf.set_font(*Fonts.TITLE)
-        pdf.cell(
+        # Horizontal rule aligned to table width
+        y = self.get_y() + 1
+        self.set_draw_color(0, 0, 0)
+        self.set_line_width(0.5)
+        self.line(self.l_margin, y, self.l_margin + TABLE_WIDTH, y)
+        self.ln(5)
+
+    def footer(self):
+        self.set_xy(self.l_margin, -14)
+        self.set_font("Helvetica", "I", 8)
+        self.set_text_color(120, 120, 120)
+        self.cell(
             0,
-            10,
-            f"Monthly Expenses - {MonthlyReports.month}",
-            new_x=XPos.LMARGIN,
-            new_y=YPos.NEXT,
+            6,
+            f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Disclaimer: This report was automatically generated.",
             align="L",
         )
-        pdf.ln(5)
 
-        # Table Header
-        pdf.set_font(*Fonts.HEADER)
-        pdf.cell(100, 10, "Subscription", new_x=XPos.RIGHT, new_y=YPos.TOP, align="L")
-        pdf.cell(40, 10, "Amount", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
+    def _table_header(self):
+        self.set_fill_color(30, 30, 30)
+        self.set_text_color(255, 255, 255)
+        self.set_font("Helvetica", "B", 9)
+        self.set_x(self.l_margin)
+        for label, width in COLUMNS:
+            self.cell(
+                width,
+                8,
+                label,
+                border=0,
+                align="L",
+                fill=True,
+                new_x=XPos.RIGHT,
+                new_y=YPos.TOP,
+            )
+        self.ln(8)
 
-        # Table Rows
-        pdf.set_font(*Fonts.BODY)
-        total = 0
-        for _, row in data.iterrows():
-            subscription = row["Subscription"]
-            currency_code = row["Currency"]
-            amount = float(row["Amount"])
+    def _table_row(self, row: "Series", fill: bool):
+        self.set_fill_color(245, 245, 245 if fill else 255)
+        self.set_text_color(0, 0, 0)
+        self.set_font("Helvetica", "", 8.5)
 
-            symbol = MonthlyReports.currency_symbols.get(
-                currency_code, currency_code
-            )  # Replace with symbol if known
-            amount_str = f"{symbol}{amount:.2f}"
+        def val(col):
+            v = row.get(col)
+            return "" if isna(v) else str(v)
 
-            pdf.cell(100, 10, subscription, new_x=XPos.RIGHT, new_y=YPos.TOP, align="L")
-            pdf.cell(40, 10, amount_str, new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L")
+        values = [
+            val("Service"),
+            val("Category"),
+            val("Currency"),
+            val("Amount"),
+            val("Payment Method"),
+            val("Notes"),
+        ]
 
-            total += amount
+        row_h = 7
+        self.set_font("Helvetica", "", 8.5)
+        self.set_x(self.l_margin)
+        for (_, width), value in zip(COLUMNS, values):
+            self.cell(
+                width,
+                row_h,
+                value,
+                border=0,
+                align="L",
+                fill=fill,
+                new_x=XPos.RIGHT,
+                new_y=YPos.TOP,
+            )
+        self.ln(row_h)
 
-        # Total Row
-        pdf.set_font(*Fonts.HEADER)
-        pdf.cell(100, 10, "Total", new_x=XPos.RIGHT, new_y=YPos.TOP, align="L")
-        pdf.cell(
-            40, 10, f"£{total:.2f}", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align="L"
+        # row separator
+        y = self.get_y()
+        self.set_draw_color(200, 200, 200)
+        self.set_line_width(0.1)
+        self.line(self.l_margin, y, self.l_margin + TABLE_WIDTH, y)
+
+    def _summary(self, df: "DataFrame"):
+        total_by_currency = df.groupby("Currency")["Amount"].sum()
+
+        self.ln(5)
+        self.set_x(self.l_margin)
+        self.set_font("Helvetica", "B", 10)
+        self.set_text_color(0, 0, 0)
+        self.cell(0, 7, "Summary", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+        self.set_font("Helvetica", "", 9)
+        self.set_x(self.l_margin)
+        self.cell(
+            0,
+            6,
+            f"Active subscriptions: {len(df)}",
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
         )
 
-        self.pdf = pdf
+        for currency, total in sorted(total_by_currency.items()):
+            self.set_x(self.l_margin)
+            self.cell(
+                0,
+                6,
+                f"Monthly total ({currency}): {total:.2f}",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
 
-        MonthlyReports._instances.append(self)
+    def build(self, df: "DataFrame"):
+        self.add_page()
+        self._table_header()
+        for i, (_, row) in enumerate(df.iterrows()):
+            self._table_row(row, fill=i % 2 == 0)
+        self._summary(df)
+
+
+def main():
+    data = read_csv(filepath_or_buffer="data/subscriptions.csv")
+    data = data[data["Active"] == True]
+    if data.empty:
+        return
+
+    pdf = Report()
+    pdf.build(data)
+    pdf.output(TEMPLATED_FILE_NAME.format(date=date.today()))
 
 
 if __name__ == "__main__":
-    import pandas as pd
-
-    g1 = MonthlyReports(pd.read_csv("data.csv"))
-    g2 = MonthlyReports(pd.read_csv("data.csv"))
-
-    for i, report in enumerate(MonthlyReports._instances):
-        report.pdf.output(f"{i}_report.pdf")
+    main()

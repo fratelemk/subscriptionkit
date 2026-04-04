@@ -1,3 +1,8 @@
-currencyconverter
-streamlit[pdf,charts]
+streamlit[pdf]
+pandas
+watchdog
+boto3
 fpdf2
+PyYAML
+plotly
+CurrencyConverter

@@ -1,0 +1,17 @@
+CSV_HEADER:
+- Service
+- Category
+- Currency
+- Amount
+- Payment Method
+- Active
+- Notes
+CURRENCIES:
+- GBP
+- EUR
+- RON
+- USD
+DATA_PATH: data/subscriptions.csv
+DISPLAY_CURRENCY: RON
+SALARY: 4200
+SALARY_CURRENCY: RON
