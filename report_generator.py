@@ -2,6 +2,7 @@ from pandas import isna, read_csv, DataFrame, Series
 from datetime import datetime, date
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
+from currency_converter import CurrencyConverter
 
 COLUMNS = [
     ("Service", 38),
@@ -18,7 +19,7 @@ TEMPLATED_FILE_NAME = "data/reports/subscriptions_{date:%m_%d_%Y}_RON.pdf"
 
 class Report(FPDF):
     def __init__(self):
-        super().__init__(orientation="L", unit="mm", format="A4")
+        super().__init__(orientation="L", unit="mm", format="A5")
         self.set_margins(12, 12, 12)
         self.set_auto_page_break(auto=True, margin=18)
 
@@ -26,7 +27,7 @@ class Report(FPDF):
         self.set_xy(self.l_margin, 8)
         self.set_font("Helvetica", "B", 20)
         self.set_text_color(0, 0, 0)
-        self.cell(0, 10, "Monthly Report", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.cell(0, 10, "Subscriptions", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         self.set_x(self.l_margin)
         self.set_font("Helvetica", "", 10)
@@ -49,7 +50,7 @@ class Report(FPDF):
         self.cell(
             0,
             6,
-            f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Disclaimer: This report was automatically generated.",
+            f"This report was automatically generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}.",
             align="L",
         )
 
@@ -113,6 +114,7 @@ class Report(FPDF):
 
     def _summary(self, df: "DataFrame"):
         total_by_currency = df.groupby("Currency")["Amount"].sum()
+        cc = CurrencyConverter()
 
         self.ln(5)
         self.set_x(self.l_margin)
@@ -130,15 +132,30 @@ class Report(FPDF):
             new_y=YPos.NEXT,
         )
 
+        total_ron = 0.0
         for currency, total in sorted(total_by_currency.items()):
             self.set_x(self.l_margin)
             self.cell(
                 0,
                 6,
-                f"Monthly total ({currency}): {total:.2f}",
+                f"Total ({currency}): {total:.2f}",
                 new_x=XPos.LMARGIN,
                 new_y=YPos.NEXT,
             )
+            try:
+                total_ron += cc.convert(total, currency, "RON")
+            except Exception:
+                pass
+
+        self.set_x(self.l_margin)
+        self.set_font("Helvetica", "B", 9)
+        self.cell(
+            0,
+            6,
+            f"Total (RON): {total_ron:.2f}",
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
+        )
 
     def build(self, df: "DataFrame"):
         self.add_page()

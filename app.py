@@ -5,6 +5,8 @@ import streamlit as st
 from currency_converter import CurrencyConverter
 from typing import NamedTuple
 import plotly.express as px
+from datetime import date
+from report_generator import Report
 
 st.set_page_config(page_title="SubscriptionKit", layout="wide")
 
@@ -310,6 +312,13 @@ def main():
     df = load_data()
     csv = df.to_csv().encode("utf-8")
 
+    df_active = df[df["Active"] == True]
+    pdf_bytes = b""
+    if not df_active.empty:
+        pdf = Report()
+        pdf.build(df_active)
+        pdf_bytes = bytes(pdf.output())
+
     with st.container(horizontal=True):
         if st.button("Add Subscription", icon=":material/add_row_below:"):
             add_subscription_dialog()
@@ -323,8 +332,21 @@ def main():
         st.space("stretch")
 
         st.download_button(
-            "Download CSV", data=csv, mime="text/csv", icon=":material/download:"
+            "Download CSV",
+            data=csv,
+            file_name=f"subscriptions_{date.today().strftime('%m_%d_%Y')}_RON.csv",
+            mime="text/csv",
+            icon=":material/download:"
         )
+
+        if pdf_bytes:
+            st.download_button(
+                "Download PDF",
+                data=pdf_bytes,
+                file_name=f"subscriptions_{date.today().strftime('%m_%d_%Y')}_RON.pdf",
+                mime="application/pdf",
+                icon=":material/picture_as_pdf:",
+            )
 
     if df.empty:
         st.info("No subscriptions.")
