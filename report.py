@@ -1,5 +1,5 @@
-from pandas import isna, read_csv, DataFrame, Series
-from datetime import datetime, date
+from pandas import isna, DataFrame, Series
+from datetime import datetime
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from currency_converter import CurrencyConverter
@@ -14,7 +14,6 @@ COLUMNS = [
 ]
 
 TABLE_WIDTH = sum(w for _, w in COLUMNS)
-TEMPLATED_FILE_NAME = "data/reports/subscriptions_{date:%m_%d_%Y}_RON.pdf"
 
 
 class Report(FPDF):
@@ -114,7 +113,6 @@ class Report(FPDF):
 
     def _summary(self, df: "DataFrame"):
         total_by_currency = df.groupby("Currency")["Amount"].sum()
-        cc = CurrencyConverter()
 
         self.ln(5)
         self.set_x(self.l_margin)
@@ -143,7 +141,7 @@ class Report(FPDF):
                 new_y=YPos.NEXT,
             )
             try:
-                total_ron += cc.convert(total, currency, "RON")
+                total_ron += float(CurrencyConverter().convert(total, currency, "RON"))
             except Exception:
                 pass
 
@@ -163,18 +161,3 @@ class Report(FPDF):
         for i, (_, row) in enumerate(df.iterrows()):
             self._table_row(row, fill=i % 2 == 0)
         self._summary(df)
-
-
-def main():
-    data = read_csv(filepath_or_buffer="data/subscriptions.csv")
-    data = data[data["Active"] == True]
-    if data.empty:
-        return
-
-    pdf = Report()
-    pdf.build(data)
-    pdf.output(TEMPLATED_FILE_NAME.format(date=date.today()))
-
-
-if __name__ == "__main__":
-    main()

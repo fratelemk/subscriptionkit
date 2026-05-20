@@ -1,6 +1,7 @@
-Service,Category,Currency,Amount,Payment Method,Active,Notes
-Netflix,Entertainment,EUR,13.99,Orange,True,
-iCloud+,Storage,GBP,2.99,VISA 7470,True,200GB
-Infuse,Entertainment,GBP,1.99,VISA 7470,True,
-YouTube Premium,Entertainment,RON,29.0,Orange,True,
-DigitalOcean Spaces,Cloud,USD,5.0,VISA 0699,True,
+Service,Category,Amount,Currency,Payment Method,Active,Notes
+Netflix,Entertainment,13.99,GBP,Orange,True,
+iCloud+,Storage,2.99,GBP,VISA 7470,True,200GB
+Infuse,Entertainment,1.99,GBP,VISA 7470,True,
+YouTube Premium,Entertainment,29.0,RON,Orange,True,
+DigitalOcean Spaces,Cloud,5.0,USD,VISA 0699,False,
+DigitalOcean Container Registry,Cloud,5.0,USD,VISA 0699,True,

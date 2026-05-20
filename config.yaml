@@ -1,8 +1,16 @@
+CATEGORIES:
+- Entertainment
+- Storage
+- Cloud
+- Productivity
+- Music
+- News
+- Utilities
 CSV_HEADER:
 - Service
 - Category
-- Currency
 - Amount
+- Currency
 - Payment Method
 - Active
 - Notes
@@ -12,6 +20,15 @@ CURRENCIES:
 - RON
 - USD
 DATA_PATH: data/subscriptions.csv
-DISPLAY_CURRENCY: RON
+DISPLAY_COLUMNS:
+- Service
+- Category
+- Amount
+- Currency
+- Converted Amount
+- Payment Method
+- Notes
+- Status
+DISPLAY_CURRENCY: GBP
 SALARY: 4200
 SALARY_CURRENCY: RON
