@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubscriptionKit</title>
+<style>
+  /* ============================================================
+     Mac OS X Aqua (10.2–10.4 era) theme — plain CSS, no libraries
+     ============================================================ */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --aqua-blue: #3b7edd;
+    --aqua-blue-dark: #1e5bb8;
+    --text: #000;
+    --text-dim: #555;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: "Lucida Grande", "Lucida Sans Unicode", Geneva, Verdana, sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    /* Classic Aqua desktop: deep blue swirl approximation */
+    background:
+      radial-gradient(ellipse at 30% 20%, #6da7e8 0%, transparent 50%),
+      radial-gradient(ellipse at 75% 70%, #1a4a9e 0%, transparent 55%),
+      linear-gradient(160deg, #4a86d8 0%, #2a5cb8 45%, #123c8a 100%);
+    background-attachment: fixed;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 34px 16px 60px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Menu bar ---------- */
+  .menubar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 22px;
+    background: linear-gradient(#fdfdfd, #e8e8e8 50%, #d5d5d5 51%, #ececec);
+    border-bottom: 1px solid #888;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 12px;
+    z-index: 100;
+    user-select: none;
+  }
+  .menubar .apple {
+    font-size: 14px;
+    padding: 0 8px;
+    color: #1a6ee8;
+    text-shadow: 0 1px 0 rgba(255,255,255,.8);
+  }
+  .menubar .menu-item {
+    padding: 2px 10px;
+    border-radius: 3px;
+    cursor: default;
+  }
+  .menubar .menu-item.app-name { font-weight: bold; }
+  .menubar .menu-item:hover {
+    background: linear-gradient(#5c9ef5, #2565d0);
+    color: #fff;
+  }
+  .menubar .spacer { flex: 1; }
+  .menubar .clock { padding: 0 6px; color: #222; }
+
+  /* ---------- Window ---------- */
+  .window {
+    width: 100%;
+    max-width: 680px;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 12px 40px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35);
+    margin-top: 20px;
+  }
+
+  .titlebar {
+    height: 22px;
+    border-radius: 8px 8px 0 0;
+    background: repeating-linear-gradient(
+        180deg,
+        #f4f4f4 0px, #f4f4f4 1px,
+        #e2e2e2 1px, #e2e2e2 2px
+      ),
+      linear-gradient(#fafafa, #ccc);
+    background-blend-mode: multiply;
+    border: 1px solid #7a7a7a;
+    border-bottom: 1px solid #9a9a9a;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    position: relative;
+    user-select: none;
+  }
+
+  .traffic-lights { display: flex; gap: 8px; }
+  .light {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    position: relative;
+    border: 1px solid rgba(0,0,0,.35);
+    cursor: default;
+  }
+  /* glossy orb highlight */
+  .light::after {
+    content: "";
+    position: absolute;
+    left: 2px; right: 2px; top: 1px;
+    height: 5px;
+    border-radius: 50%;
+    background: linear-gradient(rgba(255,255,255,.95), rgba(255,255,255,.1));
+  }
+  .light.close  { background: radial-gradient(circle at 50% 35%, #ff8a80, #e03e33 70%, #a91d12); }
+  .light.min    { background: radial-gradient(circle at 50% 35%, #ffe082, #e8a921 70%, #b57905); }
+  .light.zoom   { background: radial-gradient(circle at 50% 35%, #b9f6ca, #35b845 70%, #1a7a26); }
+
+  .titlebar .title {
+    position: absolute;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 13px;
+    color: #3a3a3a;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+    pointer-events: none;
+  }
+
+  /* ---------- Window body: pinstripes ---------- */
+  .window-body {
+    background: repeating-linear-gradient(
+      180deg,
+      #f5f5f5 0px, #f5f5f5 2px,
+      #eaeaea 2px, #eaeaea 4px
+    );
+    border: 1px solid #7a7a7a;
+    border-top: none;
+    padding: 18px 20px 22px;
+  }
+
+  h1.app-title {
+    font-size: 21px;
+    font-weight: bold;
+    text-shadow: 0 1px 0 rgba(255,255,255,.9);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1.app-title .badge {
+    display: inline-block;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(#7db4f2, #2b6cd4 55%, #1e56b0);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.7), 0 1px 2px rgba(0,0,0,.3);
+    color: #fff;
+    text-align: center;
+    line-height: 26px;
+    font-size: 14px;
+  }
+
+  /* ---------- Disclosure / expander group boxes ---------- */
+  .group {
+    border: 1px solid #b8b8b8;
+    border-radius: 6px;
+    background: rgba(255,255,255,.55);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+    margin-bottom: 16px;
+  }
+  .group summary {
+    list-style: none;
+    padding: 7px 12px;
+    font-weight: bold;
+    font-size: 12px;
+    color: #333;
+    text-shadow: 0 1px 0 rgba(255,255,255,.8);
+    cursor: default;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+  }
+  .group summary::-webkit-details-marker { display: none; }
+  .group summary::before {
+    content: "";
+    width: 0; height: 0;
+    border-left: 6px solid #666;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: transform .15s ease;
+  }
+  .group[open] summary::before { transform: rotate(90deg); }
+  .group .group-content { padding: 4px 14px 14px; }
+
+  /* ---------- Form ---------- */
+  .form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .field { flex: 1; min-width: 140px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: #333;
+    margin-bottom: 4px;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  }
+
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    font: inherit;
+    font-size: 13px;
+    padding: 3px 6px;
+    border: 1px solid #9a9a9a;
+    border-top-color: #6f6f6f;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.18);
+    outline: none;
+  }
+  input:focus, select:focus {
+    /* Aqua glowing focus ring */
+    box-shadow:
+      inset 0 1px 2px rgba(0,0,0,.15),
+      0 0 0 3px rgba(90, 150, 235, .55);
+  }
+
+  /* Aqua pop-up menu */
+  select {
+    width: 100%;
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 24px 3px 8px;
+    border: 1px solid #8a8a8a;
+    border-radius: 5px;
+    background:
+      linear-gradient(#fff, #ddd 50%, #cfcfcf 51%, #e8e8e8),
+      #e8e8e8;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image:
+      linear-gradient(#7db4f2, #2b6cd4),
+      linear-gradient(#fdfdfd, #d8d8d8);
+    background-size: 17px 100%, 100% 100%;
+    background-position: right center, left center;
+    background-repeat: no-repeat;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 1px rgba(0,0,0,.15);
+    outline: none;
+    cursor: default;
+  }
+
+  /* ---------- Aqua gel buttons ---------- */
+  .btn {
+    font: inherit;
+    font-size: 13px;
+    padding: 4px 18px;
+    border-radius: 12px;
+    border: 1px solid #6a6a6a;
+    background: linear-gradient(#fefefe, #d9d9d9 48%, #c8c8c8 52%, #efefef);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.9), 0 1px 2px rgba(0,0,0,.25);
+    color: #111;
+    cursor: default;
+    position: relative;
+  }
+  .btn:active {
+    background: linear-gradient(#c5c5c5, #a8a8a8 48%, #9c9c9c 52%, #bcbcbc);
+  }
+
+  .btn.primary {
+    border-color: #2b56a5;
+    color: #fff;
+    text-shadow: 0 -1px 0 rgba(0,0,0,.35);
+    background: linear-gradient(
+      #cfe3fb 0%,
+      #7db2f0 45%,
+      #3b7edd 50%,
+      #2f6ac9 80%,
+      #6ba3ec 100%
+    );
+    box-shadow:
+      inset 0 1px 1px rgba(255,255,255,.85),
+      inset 0 -1px 4px rgba(255,255,255,.45),
+      0 1px 2px rgba(0,0,0,.3);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .btn.primary:active {
+    background: linear-gradient(#8fb6e8, #4a7dc4 50%, #2a5cae 80%, #4d84cf 100%);
+    animation: none;
+  }
+  /* classic Aqua default-button throb */
+  @keyframes pulse {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.18) saturate(1.15); }
+  }
+
+  /* ---------- Table (Aqua list view) ---------- */
+  .table-wrap {
+    border: 1px solid #9a9a9a;
+    background: #fff;
+    margin-bottom: 16px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  thead th {
+    text-align: left;
+    font-weight: normal;
+    padding: 4px 10px;
+    background: linear-gradient(#fdfdfd, #e6e6e6 60%, #d8d8d8);
+    border-bottom: 1px solid #aaa;
+    border-right: 1px solid #ccc;
+    color: #333;
+    text-shadow: 0 1px 0 rgba(255,255,255,.8);
+    user-select: none;
+  }
+  thead th:last-child { border-right: none; }
+  tbody td {
+    padding: 4px 10px;
+    border-right: 1px solid transparent;
+  }
+  /* Aqua alternating rows: white / pale blue */
+  tbody tr:nth-child(even) { background: #edf3fe; }
+  tbody tr.selected {
+    background: linear-gradient(#5c9ef5, #2565d0);
+    color: #fff;
+  }
+  tbody tr { cursor: default; user-select: none; }
+  .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
+  th.amount-col { text-align: right; }
+
+  .empty-note {
+    padding: 18px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  /* ---------- Metrics ---------- */
+  .metrics {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .metric {
+    flex: 1;
+    min-width: 150px;
+    border: 1px solid #b0b0b0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: linear-gradient(rgba(255,255,255,.9), rgba(240,240,240,.85));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 2px rgba(0,0,0,.12);
+  }
+  .metric .label {
+    font-size: 11px;
+    color: #555;
+    margin-bottom: 3px;
+    text-shadow: 0 1px 0 rgba(255,255,255,.8);
+  }
+  .metric .value {
+    font-size: 18px;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+  }
+  .metric .value.negative { color: #c22; }
+
+  /* Aqua striped progress bar for % of salary */
+  .progress-track {
+    margin-top: 7px;
+    height: 12px;
+    border-radius: 7px;
+    border: 1px solid #8a8a8a;
+    background: linear-gradient(#dcdcdc, #f2f2f2);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 6px;
+    background:
+      linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,0) 45%,
+                      rgba(0,0,0,.08) 55%, rgba(255,255,255,.25)),
+      repeating-linear-gradient(
+        -45deg,
+        #6faaf0 0px, #6faaf0 8px,
+        #3b7edd 8px, #3b7edd 16px
+      );
+    background-size: 100% 100%, 32px 32px;
+    animation: barber 1.2s linear infinite;
+    transition: width .3s ease;
+  }
+  .progress-fill.over {
+    background:
+      linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,0) 45%,
+                      rgba(0,0,0,.08) 55%, rgba(255,255,255,.25)),
+      repeating-linear-gradient(
+        -45deg,
+        #f08a80 0px, #f08a80 8px,
+        #d94438 8px, #d94438 16px
+      );
+    background-size: 100% 100%, 32px 32px;
+  }
+  @keyframes barber {
+    from { background-position: 0 0, 0 0; }
+    to   { background-position: 0 0, 32px 0; }
+  }
+
+  /* ---------- Manage / delete ---------- */
+  .manage-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .manage-row select { flex: 1; min-width: 200px; width: auto; }
+
+  /* ---------- Alerts (Aqua sheet-style messages) ---------- */
+  .alert {
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+    border: 1px solid;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+    display: none;
+  }
+  .alert.show { display: block; }
+  .alert.error {
+    background: linear-gradient(#ffe3e0, #ffd0cb);
+    border-color: #d89a94;
+    color: #7a1d14;
+  }
+  .alert.success {
+    background: linear-gradient(#e2f6e2, #cdeccd);
+    border-color: #96c496;
+    color: #1d5c1d;
+  }
+
+  hr.aqua-divider {
+    border: none;
+    border-top: 1px solid #c0c0c0;
+    border-bottom: 1px solid rgba(255,255,255,.9);
+    margin: 4px 0 16px;
+  }
+
+  .footnote {
+    margin-top: 14px;
+    font-size: 10px;
+    color: rgba(255,255,255,.75);
+    text-shadow: 0 1px 2px rgba(0,0,0,.4);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <span class="apple"></span>
+  <span class="menu-item app-name">SubscriptionKit</span>
+  <span class="menu-item">File</span>
+  <span class="menu-item">Edit</span>
+  <span class="menu-item">View</span>
+  <span class="menu-item">Window</span>
+  <span class="menu-item">Help</span>
+  <span class="spacer"></span>
+  <span class="clock" id="clock"></span>
+</div>
+
+<div class="window">
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <span class="light close"></span>
+      <span class="light min"></span>
+      <span class="light zoom"></span>
+    </div>
+    <div class="title">SubscriptionKit</div>
+  </div>
+
+  <div class="window-body">
+    <h1 class="app-title"><span class="badge">💳</span> SubscriptionKit</h1>
+
+    <div class="alert error" id="alert-error"></div>
+    <div class="alert success" id="alert-success"></div>
+
+    <!-- Add Subscription -->
+    <details class="group" id="add-group">
+      <summary>Add Subscription</summary>
+      <div class="group-content">
+        <form id="add-form">
+          <div class="form-row">
+            <div class="field">
+              <label for="f-name">Name</label>
+              <input type="text" id="f-name" placeholder="Netflix">
+            </div>
+            <div class="field">
+              <label for="f-currency">Currency</label>
+              <select id="f-currency">
+                <option>USD</option>
+                <option selected>GBP</option>
+                <option>EUR</option>
+                <option>RON</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="f-amount">Monthly Amount</label>
+              <input type="number" id="f-amount" min="0.01" step="0.01" value="9.99">
+            </div>
+          </div>
+          <button type="submit" class="btn primary">Add Subscription</button>
+        </form>
+      </div>
+    </details>
+
+    <hr class="aqua-divider">
+
+    <!-- Table -->
+    <div class="table-wrap" id="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th class="amount-col">Original Amount</th>
+            <th class="amount-col">Amount (RON)</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div class="empty-note" id="empty-note" style="display:none">
+        No subscriptions found. Add your first subscription above!
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="metrics" id="metrics">
+      <div class="metric">
+        <div class="label">Total Monthly Costs</div>
+        <div class="value" id="m-total">–</div>
+      </div>
+      <div class="metric">
+        <div class="label">Remaining Salary</div>
+        <div class="value" id="m-remaining">–</div>
+      </div>
+      <div class="metric">
+        <div class="label">% of Salary Used</div>
+        <div class="value" id="m-percent">–</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="m-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="aqua-divider">
+
+    <!-- Manage -->
+    <details class="group">
+      <summary>Manage Subscriptions</summary>
+      <div class="group-content">
+        <div class="manage-row">
+          <select id="delete-select"></select>
+          <button class="btn" id="delete-btn">Delete</button>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="footnote">Mock interface — data stored in memory only. Exchange rates are static approximations.</div>
+
+<script>
+  // Mirrors app.py constants
+  const SALARY = 3500;
+  const SALARY_CURRENCY = "RON";
+  const DEFAULT_CURRENCY = "RON";
+
+  // Static mock rates: 1 unit of currency in RON
+  const RATES_TO_RON = { RON: 1, EUR: 4.97, USD: 4.28, GBP: 5.86 };
+
+  let subscriptions = [
+    { name: "Test", currency: "GBP", amount: 9.99 }
+  ];
+  let selectedRow = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  function toRON(amount, currency) {
+    return amount * (RATES_TO_RON[currency] ?? 1);
+  }
+
+  function fmt(n, cur) { return n.toFixed(2) + " " + cur; }
+
+  function showAlert(kind, msg) {
+    const el = $(kind === "error" ? "alert-error" : "alert-success");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove("show"), 3500);
+  }
+
+  function validate(name, currency, amount) {
+    if (!name || !name.trim()) return "Subscription name cannot be empty.";
+    if (!currency) return "Please select a currency.";
+    if (!(amount > 0)) return "Amount must be greater than 0.";
+    return null;
+  }
+
+  function render() {
+    const tbody = $("table-body");
+    tbody.innerHTML = "";
+
+    const empty = subscriptions.length === 0;
+    $("empty-note").style.display = empty ? "block" : "none";
+    $("metrics").style.display = empty ? "none" : "flex";
+
+    let total = 0;
+
+    subscriptions.forEach((s, i) => {
+      const converted = toRON(s.amount, s.currency);
+      total += converted;
+
+      const tr = document.createElement("tr");
+      if (i === selectedRow) tr.classList.add("selected");
+      tr.innerHTML =
+        "<td>" + escapeHTML(s.name) + "</td>" +
+        '<td class="amount-cell">' + fmt(s.amount, s.currency) + "</td>" +
+        '<td class="amount-cell">' + fmt(converted, DEFAULT_CURRENCY) + "</td>";
+      tr.addEventListener("click", () => {
+        selectedRow = (selectedRow === i) ? null : i;
+        render();
+      });
+      tbody.appendChild(tr);
+    });
+
+    if (!empty) {
+      const remaining = SALARY - total;
+      const percent = (total / SALARY) * 100;
+
+      $("m-total").textContent = fmt(total, DEFAULT_CURRENCY);
+
+      const rem = $("m-remaining");
+      rem.textContent = fmt(remaining, DEFAULT_CURRENCY);
+      rem.classList.toggle("negative", remaining < 0);
+
+      $("m-percent").textContent = percent.toFixed(1) + "%";
+      const bar = $("m-bar");
+      bar.style.width = Math.min(percent, 100) + "%";
+      bar.classList.toggle("over", percent > 100);
+    }
+
+    // Delete pop-up menu
+    const sel = $("delete-select");
+    sel.innerHTML = "";
+    subscriptions.forEach((s, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = s.name + " - " + fmt(s.amount, s.currency);
+      sel.appendChild(opt);
+    });
+    sel.disabled = empty;
+    $("delete-btn").disabled = empty;
+  }
+
+  function escapeHTML(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  $("add-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("f-name").value;
+    const currency = $("f-currency").value;
+    const amount = parseFloat($("f-amount").value);
+
+    const err = validate(name, currency, amount);
+    if (err) { showAlert("error", err); return; }
+
+    subscriptions.push({ name: name.trim(), currency, amount });
+    $("f-name").value = "";
+    $("f-amount").value = "9.99";
+    selectedRow = null;
+    showAlert("success", "Subscription added.");
+    render();
+  });
+
+  $("delete-btn").addEventListener("click", () => {
+    const sel = $("delete-select");
+    if (sel.value === "") return;
+    subscriptions.splice(parseInt(sel.value, 10), 1);
+    selectedRow = null;
+    showAlert("success", "Subscription deleted successfully!");
+    render();
+  });
+
+  // Menu bar clock
+  function tick() {
+    const d = new Date();
+    $("clock").textContent = d.toLocaleDateString(undefined, { weekday: "short" }) +
+      " " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  tick();
+  setInterval(tick, 30000);
+
+  $("add-group").open = true;
+  render();
+</script>
+</body>
+</html>

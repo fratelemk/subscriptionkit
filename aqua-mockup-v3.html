@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubscriptionKit</title>
+<style>
+  /* ==================================================================
+     SubscriptionKit v3 — buttonless, command-driven ledger.
+     One smart field + direct manipulation. Aqua era, minimal chrome.
+     ================================================================== */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: "Lucida Grande", "Lucida Sans Unicode", Geneva, Verdana, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+    background:
+      radial-gradient(ellipse at 30% 10%, #7fb2ec 0%, transparent 55%),
+      linear-gradient(160deg, #4a86d8, #2a5cb8 55%, #123c8a);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 48px 20px;
+    overflow-y: auto;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .panel {
+    width: 100%;
+    max-width: 560px;
+    background: repeating-linear-gradient(180deg,
+      #fafafa 0, #fafafa 2px, #f1f1f1 2px, #f1f1f1 4px);
+    border: 1px solid #6f6f6f;
+    border-radius: 10px;
+    box-shadow: 0 16px 48px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35);
+    overflow: hidden;
+  }
+
+  /* Slim unified titlebar — no traffic lights, no widgets */
+  .titlebar {
+    padding: 9px 16px 8px;
+    text-align: center;
+    font-size: 13px;
+    color: #444;
+    text-shadow: 0 1px 0 rgba(255,255,255,.8);
+    background: linear-gradient(#fdfdfd, #e6e6e6);
+    border-bottom: 1px solid #bdbdbd;
+    user-select: none;
+  }
+  .titlebar b { color: #222; }
+
+  /* ================= COMMAND FIELD ================= */
+  .command-area {
+    padding: 18px 20px 6px;
+  }
+  .command {
+    width: 100%;
+    font-family: inherit;
+    font-size: 17px;
+    padding: 9px 14px;
+    border: 1px solid #8a8a8a;
+    border-top-color: #6a6a6a;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.2);
+    outline: none;
+  }
+  .command:focus {
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.15), 0 0 0 4px rgba(90,150,235,.5);
+  }
+  .command::placeholder { color: #b5b5b5; }
+
+  /* live parse preview */
+  .preview {
+    min-height: 20px;
+    padding: 5px 16px 0;
+    font-size: 11px;
+    color: #666;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+    user-select: none;
+  }
+  .preview .ok    { color: #1d6a1d; }
+  .preview .cmd   { color: #14508f; }
+  .preview .bad   { color: #a01c10; }
+  .preview kbd {
+    font-family: inherit;
+    font-size: 10px;
+    border: 1px solid #bbb;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 0 4px;
+    background: #fff;
+    color: #555;
+  }
+
+  /* ================= LEDGER ================= */
+  .ledger {
+    margin: 12px 20px 0;
+    border: 1px solid #adadad;
+    border-radius: 6px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.06);
+  }
+
+  .ledger-head, .row {
+    display: grid;
+    grid-template-columns: 1fr 110px 130px;
+    align-items: center;
+  }
+  .ledger-head {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: #888;
+    padding: 6px 14px 5px;
+    border-bottom: 1px solid #ddd;
+    background: linear-gradient(#fcfcfc, #f2f2f2);
+    user-select: none;
+  }
+  .ledger-head .r, .row .r { text-align: right; }
+
+  .rows { outline: none; }
+
+  .row {
+    padding: 7px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: default;
+    transition: opacity .18s, transform .18s;
+  }
+  .row:last-child { border-bottom: none; }
+  .row:nth-child(even) { background: #f5f8fd; }
+  .row.selected {
+    background: linear-gradient(#5c9ef5, #2565d0);
+    color: #fff;
+  }
+  .row.selected .sub { color: #dce9ff; }
+  .row.poof {
+    opacity: 0;
+    transform: scale(.6);
+  }
+
+  .row .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .orig { font-size: 12px; font-variant-numeric: tabular-nums; }
+  .row .conv { font-size: 13px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .row .sub { display: block; font-size: 9px; color: #999; font-weight: normal; }
+
+  /* inline editing */
+  .cell-edit {
+    font: inherit;
+    width: 100%;
+    border: none;
+    outline: none;
+    background: rgba(255,255,255,.95);
+    border-radius: 3px;
+    padding: 1px 4px;
+    box-shadow: 0 0 0 3px rgba(90,150,235,.55);
+    color: #000;
+  }
+  .r .cell-edit { text-align: right; }
+
+  .empty {
+    padding: 34px 20px;
+    text-align: center;
+    color: #999;
+    font-size: 12px;
+    user-select: none;
+  }
+  .empty em { font-style: normal; color: #555; }
+
+  /* ================= SUMMARY FOOTER ================= */
+  .summary {
+    margin: 0 20px;
+    padding: 12px 14px 4px;
+    user-select: none;
+  }
+  .sum-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 12px;
+    color: #444;
+    padding: 3px 0;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  }
+  .sum-line .amt { font-variant-numeric: tabular-nums; font-weight: bold; color: #111; }
+  .sum-line.total { font-size: 14px; border-top: 1px solid #ccc; margin-top: 4px; padding-top: 8px; }
+  .sum-line .amt.negative { color: #b3251a; }
+
+  /* thin inline gauge — no chrome, part of the text flow */
+  .gauge {
+    margin: 8px 0 2px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(0,0,0,.12);
+    overflow: hidden;
+  }
+  .gauge > div {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(#7db4f2, #2b6cd4);
+    transition: width .35s ease;
+  }
+  .gauge.over > div { background: linear-gradient(#f08a80, #c73327); }
+  .gauge-caption {
+    font-size: 10px;
+    color: #888;
+    text-align: right;
+    padding-bottom: 2px;
+  }
+
+  /* ================= HINT FOOTER ================= */
+  .hints {
+    margin-top: 10px;
+    padding: 9px 20px 12px;
+    border-top: 1px solid #d8d8d8;
+    background: linear-gradient(#f2f2f2, #e7e7e7);
+    font-size: 10px;
+    color: #7a7a7a;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+    line-height: 1.7;
+    user-select: none;
+  }
+  .hints code {
+    font-family: Monaco, "Courier New", monospace;
+    font-size: 9px;
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 3px;
+    padding: 0 4px;
+    color: #333;
+  }
+
+  .footnote {
+    position: fixed;
+    bottom: 10px; left: 0; right: 0;
+    text-align: center;
+    font-size: 10px;
+    color: rgba(255,255,255,.7);
+    text-shadow: 0 1px 2px rgba(0,0,0,.4);
+    user-select: none;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <div class="titlebar"><b>SubscriptionKit</b> — <span id="title-cur">RON</span> ledger</div>
+
+  <div class="command-area">
+    <input type="text" class="command" id="command" autocomplete="off"
+           placeholder="Type: Netflix 12.99 EUR">
+    <div class="preview" id="preview"></div>
+  </div>
+
+  <div class="ledger">
+    <div class="ledger-head">
+      <span>Service</span>
+      <span class="r">Original</span>
+      <span class="r" id="head-conv">RON</span>
+    </div>
+    <div class="rows" id="rows" tabindex="0"></div>
+    <div class="empty" id="empty" style="display:none">
+      Ledger is empty.<br>
+      Type <em>Spotify 23.99 RON</em> above and press Return.
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="sum-line">
+      <span>Monthly salary</span>
+      <span class="amt" id="s-salary"></span>
+    </div>
+    <div class="sum-line">
+      <span id="s-count-label">Subscriptions</span>
+      <span class="amt" id="s-total"></span>
+    </div>
+    <div class="sum-line total">
+      <span>Remaining</span>
+      <span class="amt" id="s-remaining"></span>
+    </div>
+    <div class="gauge" id="gauge"><div id="gauge-fill"></div></div>
+    <div class="gauge-caption" id="gauge-caption"></div>
+  </div>
+
+  <div class="hints">
+    <code>Netflix 12.99 EUR</code> add &nbsp;·&nbsp;
+    <code>rm Netflix</code> remove &nbsp;·&nbsp;
+    <code>in usd</code> switch display currency &nbsp;·&nbsp;
+    double-click a cell to edit &nbsp;·&nbsp;
+    <code>↑</code><code>↓</code> select, <code>⌫</code> delete, <code>Esc</code> back to typing
+  </div>
+</div>
+
+<div class="footnote">Mock — data in memory only. Static exchange rates.</div>
+
+<script>
+  // Mirrors app.py constants
+  const SALARY = 3500;
+  const SALARY_CURRENCY = "RON";
+  const RATES_TO_RON = { RON: 1, EUR: 4.97, USD: 4.28, GBP: 5.86 };
+  const CURRENCIES = Object.keys(RATES_TO_RON);
+  const DEFAULT_ENTRY_CURRENCY = "RON";
+
+  let subscriptions = [
+    { name: "Test", currency: "GBP", amount: 9.99 },
+    { name: "Netflix", currency: "EUR", amount: 12.99 },
+    { name: "Spotify", currency: "RON", amount: 23.99 }
+  ];
+  let displayCurrency = "RON";
+  let selectedIndex = -1;
+  let nextId = 0;
+  subscriptions.forEach(s => s.id = nextId++);
+
+  const $ = id => document.getElementById(id);
+  const cmdField = $("command");
+  const rowsEl = $("rows");
+
+  const convert = (amt, from, to) => amt * RATES_TO_RON[from] / RATES_TO_RON[to];
+  const fmt = (n, cur) => n.toFixed(2) + " " + cur;
+  const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
+
+  /* ============ COMMAND PARSER ============ */
+  // Returns { type, ... } — add | remove | display | invalid | empty
+  function parse(input) {
+    const raw = input.trim();
+    if (!raw) return { type: "empty" };
+    const tokens = raw.split(/\s+/);
+    const lower = tokens.map(t => t.toLowerCase());
+
+    // "in eur" / "display usd" / "show ron"
+    if (["in", "display", "show"].includes(lower[0]) && tokens.length === 2) {
+      const cur = tokens[1].toUpperCase();
+      if (CURRENCIES.includes(cur)) return { type: "display", currency: cur };
+      return { type: "invalid", reason: `Unknown currency “${tokens[1]}”. Use ${CURRENCIES.join(", ")}.` };
+    }
+
+    // "rm Netflix" / "remove Netflix" / "delete Netflix"
+    if (["rm", "remove", "delete"].includes(lower[0])) {
+      const query = tokens.slice(1).join(" ").toLowerCase();
+      if (!query) return { type: "invalid", reason: "Remove what? e.g. rm Netflix" };
+      const match = subscriptions.find(s => s.name.toLowerCase() === query) ||
+                    subscriptions.find(s => s.name.toLowerCase().startsWith(query));
+      if (!match) return { type: "invalid", reason: `No subscription matching “${tokens.slice(1).join(" ")}”.` };
+      return { type: "remove", target: match };
+    }
+
+    // Add: name tokens + one number + optional currency code (any order after name)
+    let amount = null, currency = null;
+    const nameTokens = [];
+    for (const t of tokens) {
+      const up = t.toUpperCase();
+      if (amount === null && /^\d+([.,]\d+)?$/.test(t)) {
+        amount = parseFloat(t.replace(",", "."));
+      } else if (currency === null && CURRENCIES.includes(up)) {
+        currency = up;
+      } else {
+        nameTokens.push(t);
+      }
+    }
+    const name = nameTokens.join(" ");
+    if (!name && amount === null) return { type: "invalid", reason: "Could not read that. Try: Name Amount Currency" };
+    if (!name) return { type: "invalid", reason: "Subscription name cannot be empty." };
+    if (amount === null) return { type: "partial", name };
+    if (amount <= 0) return { type: "invalid", reason: "Amount must be greater than 0." };
+    return { type: "add", name, amount, currency: currency || DEFAULT_ENTRY_CURRENCY, currencyAssumed: !currency };
+  }
+
+  /* ============ LIVE PREVIEW ============ */
+  function updatePreview() {
+    const p = parse(cmdField.value);
+    const el = $("preview");
+    switch (p.type) {
+      case "empty":
+        el.innerHTML = `Press <kbd>Return</kbd> to run. Try “Netflix 12.99 EUR”.`;
+        break;
+      case "partial":
+        el.innerHTML = `Adding <b>${esc(p.name)}</b> — now type the amount…`;
+        break;
+      case "add": {
+        const conv = convert(p.amount, p.currency, displayCurrency);
+        const assumed = p.currencyAssumed ? " (assumed)" : "";
+        el.innerHTML = `<span class="ok">Add</span> <b>${esc(p.name)}</b> — ` +
+          `${fmt(p.amount, p.currency)}${assumed}` +
+          (p.currency !== displayCurrency ? ` = ${fmt(conv, displayCurrency)}` : "");
+        break;
+      }
+      case "remove":
+        el.innerHTML = `<span class="cmd">Remove</span> <b>${esc(p.target.name)}</b> — ${fmt(p.target.amount, p.target.currency)}`;
+        break;
+      case "display":
+        el.innerHTML = `<span class="cmd">Switch display currency</span> to <b>${p.currency}</b>`;
+        break;
+      case "invalid":
+        el.innerHTML = `<span class="bad">${esc(p.reason)}</span>`;
+        break;
+    }
+  }
+
+  /* ============ EXECUTE ============ */
+  function execute() {
+    const p = parse(cmdField.value);
+    switch (p.type) {
+      case "add":
+        subscriptions.push({ id: nextId++, name: p.name, currency: p.currency, amount: p.amount });
+        cmdField.value = "";
+        render();
+        break;
+      case "remove":
+        poofRemove(p.target.id);
+        cmdField.value = "";
+        break;
+      case "display":
+        displayCurrency = p.currency;
+        cmdField.value = "";
+        render();
+        break;
+    }
+    updatePreview();
+  }
+
+  function poofRemove(id) {
+    const rowEl = rowsEl.querySelector(`[data-id="${id}"]`);
+    const doRemove = () => {
+      subscriptions = subscriptions.filter(s => s.id !== id);
+      if (selectedIndex >= subscriptions.length) selectedIndex = subscriptions.length - 1;
+      render();
+    };
+    if (rowEl) {
+      rowEl.classList.add("poof");
+      setTimeout(doRemove, 180);
+    } else doRemove();
+  }
+
+  /* ============ INLINE EDITING ============ */
+  function startEdit(rowIndex, field, cellEl) {
+    const sub = subscriptions[rowIndex];
+    const input = document.createElement("input");
+    input.className = "cell-edit";
+    input.value = field === "name" ? sub.name : `${sub.amount.toFixed(2)} ${sub.currency}`;
+    cellEl.innerHTML = "";
+    cellEl.appendChild(input);
+    input.focus();
+    input.select();
+
+    let done = false;
+    const commit = () => {
+      if (done) return; done = true;
+      const v = input.value.trim();
+      if (field === "name") {
+        if (v) sub.name = v;
+      } else {
+        const m = v.match(/^(\d+(?:[.,]\d+)?)\s*([A-Za-z]{3})?$/);
+        if (m) {
+          const amt = parseFloat(m[1].replace(",", "."));
+          const cur = m[2] ? m[2].toUpperCase() : sub.currency;
+          if (amt > 0 && CURRENCIES.includes(cur)) {
+            sub.amount = amt;
+            sub.currency = cur;
+          }
+        }
+      }
+      render();
+      cmdField.focus();
+    };
+    const cancel = () => { if (done) return; done = true; render(); cmdField.focus(); };
+
+    input.addEventListener("keydown", e => {
+      e.stopPropagation();
+      if (e.key === "Enter") commit();
+      else if (e.key === "Escape") cancel();
+    });
+    input.addEventListener("blur", commit);
+  }
+
+  /* ============ KEYBOARD ============ */
+  cmdField.addEventListener("input", updatePreview);
+  cmdField.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); execute(); }
+    else if (e.key === "ArrowDown" && subscriptions.length) {
+      e.preventDefault();
+      selectedIndex = 0;
+      rowsEl.focus();
+      render();
+    }
+  });
+
+  rowsEl.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectedIndex = Math.min(selectedIndex + 1, subscriptions.length - 1);
+      render();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (selectedIndex <= 0) {
+        selectedIndex = -1;
+        render();
+        cmdField.focus();
+      } else {
+        selectedIndex--;
+        render();
+      }
+    } else if (e.key === "Backspace" || e.key === "Delete") {
+      e.preventDefault();
+      if (selectedIndex >= 0) poofRemove(subscriptions[selectedIndex].id);
+    } else if (e.key === "Escape") {
+      selectedIndex = -1;
+      render();
+      cmdField.focus();
+    }
+  });
+
+  /* ============ RENDER ============ */
+  function render() {
+    $("title-cur").textContent = displayCurrency;
+    $("head-conv").textContent = displayCurrency;
+
+    rowsEl.innerHTML = "";
+    $("empty").style.display = subscriptions.length ? "none" : "block";
+
+    subscriptions.forEach((s, i) => {
+      const row = document.createElement("div");
+      row.className = "row" + (i === selectedIndex ? " selected" : "");
+      row.dataset.id = s.id;
+      const conv = convert(s.amount, s.currency, displayCurrency);
+
+      const nameCell = document.createElement("span");
+      nameCell.className = "name";
+      nameCell.textContent = s.name;
+
+      const origCell = document.createElement("span");
+      origCell.className = "orig r";
+      origCell.textContent = fmt(s.amount, s.currency);
+
+      const convCell = document.createElement("span");
+      convCell.className = "conv r";
+      convCell.innerHTML = conv.toFixed(2) +
+        `<span class="sub">${((convert(s.amount, s.currency, SALARY_CURRENCY) / SALARY) * 100).toFixed(1)}% of salary</span>`;
+
+      row.append(nameCell, origCell, convCell);
+
+      row.addEventListener("click", () => {
+        selectedIndex = (selectedIndex === i) ? -1 : i;
+        rowsEl.focus();
+        render();
+      });
+      nameCell.addEventListener("dblclick", e => { e.stopPropagation(); startEdit(i, "name", nameCell); });
+      origCell.addEventListener("dblclick", e => { e.stopPropagation(); startEdit(i, "amount", origCell); });
+
+      rowsEl.appendChild(row);
+    });
+
+    // Summary
+    const total = subscriptions.reduce(
+      (sum, s) => sum + convert(s.amount, s.currency, displayCurrency), 0);
+    const salaryConv = convert(SALARY, SALARY_CURRENCY, displayCurrency);
+    const remaining = salaryConv - total;
+    const percent = salaryConv > 0 ? (total / salaryConv) * 100 : 0;
+
+    $("s-salary").textContent = fmt(salaryConv, displayCurrency);
+    $("s-count-label").textContent =
+      `Subscriptions (${subscriptions.length})`;
+    $("s-total").textContent = "− " + fmt(total, displayCurrency);
+    const rem = $("s-remaining");
+    rem.textContent = fmt(remaining, displayCurrency);
+    rem.classList.toggle("negative", remaining < 0);
+
+    $("gauge").classList.toggle("over", percent > 100);
+    $("gauge-fill").style.width = Math.min(percent, 100) + "%";
+    $("gauge-caption").textContent = percent.toFixed(1) + "% of salary used";
+  }
+
+  render();
+  updatePreview();
+  cmdField.focus();
+</script>
+</body>
+</html>

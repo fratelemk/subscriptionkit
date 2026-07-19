@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubscriptionKit</title>
+<style>
+  /* ==================================================================
+     SubscriptionKit v4 — Tiger/Leopard-era single-window app.
+     Unified toolbar, scope bar, inline row editing (no forms),
+     iTunes-style capacity bar as the budget metric. Plain CSS/JS.
+     ================================================================== */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: "Lucida Grande", "Lucida Sans Unicode", Geneva, Verdana, sans-serif;
+    font-size: 13px;
+    color: #000;
+    background:
+      radial-gradient(ellipse at 70% 20%, #9b59d0 0%, transparent 50%),
+      radial-gradient(ellipse at 20% 80%, #2a2a72 0%, transparent 60%),
+      linear-gradient(150deg, #5b3fa8, #2c2c6e 60%, #141438);
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* ================= MENU BAR ================= */
+  .menubar {
+    height: 22px; flex: none;
+    background: linear-gradient(#fdfdfd, #e9e9e9 55%, #d6d6d6 56%, #ececec);
+    border-bottom: 1px solid #808080;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    display: flex; align-items: stretch;
+    padding: 0 8px; font-size: 12px;
+    position: relative; z-index: 500;
+  }
+  .menu { position: relative; display: flex; align-items: center; }
+  .menu > .menu-title {
+    padding: 0 10px; height: 100%;
+    display: flex; align-items: center;
+    cursor: default; white-space: nowrap;
+  }
+  .menu > .menu-title.apple { font-size: 14px; color: #1a6ee8; padding: 0 12px; }
+  .menu > .menu-title.appname { font-weight: bold; }
+  .menu.open > .menu-title { background: linear-gradient(#5c9ef5, #2565d0); color: #fff; }
+  .menu.open > .menu-title.apple { color: #fff; }
+
+  .dropdown {
+    display: none;
+    position: absolute; top: 22px; left: 0;
+    min-width: 230px;
+    background: rgba(248,248,248,.97);
+    border: 1px solid #9a9a9a; border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.4);
+    padding: 4px 0; z-index: 600;
+  }
+  .menu.open .dropdown { display: block; }
+  .mi {
+    padding: 3px 20px 3px 22px;
+    display: flex; justify-content: space-between; gap: 30px;
+    cursor: default; white-space: nowrap;
+  }
+  .mi .shortcut { color: #777; }
+  .mi:hover:not(.disabled) { background: linear-gradient(#5c9ef5, #2565d0); color: #fff; }
+  .mi:hover:not(.disabled) .shortcut { color: #dce9ff; }
+  .mi.disabled { color: #aaa; }
+  .mi.checked { position: relative; }
+  .mi.checked::before { content: "✓"; position: absolute; left: 7px; }
+  .m-sep { height: 1px; background: #d4d4d4; margin: 4px 1px; }
+  .menubar .spacer { flex: 1; }
+  .menubar .clock { display: flex; align-items: center; padding: 0 8px; color: #222; }
+
+  /* ================= WINDOW ================= */
+  .window {
+    flex: 1;
+    margin: 30px auto;
+    width: min(640px, calc(100vw - 48px));
+    display: flex; flex-direction: column;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #3f3f3f;
+    box-shadow: 0 18px 50px rgba(0,0,0,.65), 0 3px 10px rgba(0,0,0,.4);
+    min-height: 0;
+    background: #fff;
+  }
+
+  /* Unified titlebar + toolbar (Leopard) */
+  .unified {
+    flex: none;
+    background: linear-gradient(#f4f4f4, #cfcfcf);
+    border-bottom: 1px solid #6e6e6e;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    padding: 6px 10px 8px;
+  }
+  .title-row {
+    display: flex; align-items: center;
+    position: relative;
+    height: 18px;
+    margin-bottom: 6px;
+  }
+  .traffic-lights { display: flex; gap: 8px; z-index: 2; }
+  .light {
+    width: 13px; height: 13px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,.35); position: relative;
+  }
+  .light::after {
+    content: "";
+    position: absolute; left: 2px; right: 2px; top: 1px; height: 5px;
+    border-radius: 50%;
+    background: linear-gradient(rgba(255,255,255,.95), rgba(255,255,255,.1));
+  }
+  .light.close { background: radial-gradient(circle at 50% 35%, #ff8a80, #e03e33 70%, #a91d12); }
+  .light.min   { background: radial-gradient(circle at 50% 35%, #ffe082, #e8a921 70%, #b57905); }
+  .light.zoom  { background: radial-gradient(circle at 50% 35%, #b9f6ca, #35b845 70%, #1a7a26); }
+  .title-row .title {
+    position: absolute; left: 0; right: 0;
+    text-align: center; font-size: 13px; font-weight: bold;
+    color: #3c3c3c;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  }
+
+  /* Scope bar (Finder-style capsules) */
+  .scope-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .scope-label {
+    font-size: 11px; color: #555;
+    text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  }
+  .scope-group { display: flex; gap: 4px; }
+  .scope {
+    font: inherit; font-size: 11px;
+    padding: 2px 12px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #333;
+    cursor: default;
+  }
+  .scope:hover { border-color: #aaa; }
+  .scope.active {
+    background: linear-gradient(#8c8c8c, #6e6e6e);
+    border-color: #5a5a5a;
+    color: #fff;
+    text-shadow: 0 -1px 0 rgba(0,0,0,.3);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+  }
+  .scope-row .flex { flex: 1; }
+  .display-cur {
+    font-size: 11px; color: #555;
+    text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  }
+  .display-cur b { color: #222; }
+
+  /* ================= LIST ================= */
+  .list {
+    flex: 1;
+    overflow-y: auto;
+    background: #fff;
+    outline: none;
+  }
+  .lrow {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: default;
+    transition: opacity .18s, transform .18s;
+  }
+  .lrow:nth-child(even) { background: #f4f7fb; }
+  .lrow.selected { background: linear-gradient(#5c9ef5, #2565d0); color: #fff; }
+  .lrow.dimmed { opacity: .35; }
+  .lrow.poof { opacity: 0; transform: scale(.6); }
+
+  .dot {
+    flex: none;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 11px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+    text-shadow: 0 1px 1px rgba(0,0,0,.35);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.55), inset 0 -2px 3px rgba(0,0,0,.2), 0 1px 1px rgba(0,0,0,.2);
+  }
+
+  .lrow .info { flex: 1; min-width: 0; }
+  .lrow .name {
+    font-size: 13px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .lrow .meta { font-size: 10px; color: #888; }
+  .lrow.selected .meta { color: #d5e5fb; }
+
+  .lrow .amounts { text-align: right; }
+  .lrow .conv { font-size: 13px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .lrow .orig { font-size: 10px; color: #888; font-variant-numeric: tabular-nums; }
+  .lrow.selected .orig { color: #d5e5fb; }
+
+  /* Inline edit mode */
+  .lrow.editing { background: #eaf2fd; }
+  .lrow.editing input, .lrow.editing select {
+    font: inherit; font-size: 12px;
+    padding: 2px 5px;
+    border: 1px solid #9a9a9a;
+    background: #fff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(90,150,235,.45);
+    border-radius: 3px;
+    user-select: text;
+  }
+  .lrow.editing .e-name { width: 100%; }
+  .lrow.editing .e-amount { width: 76px; text-align: right; }
+  .lrow.editing .e-currency { width: 64px; }
+  .edit-fields { display: flex; gap: 8px; flex: 1; align-items: center; }
+  .edit-err {
+    font-size: 10px; color: #a01c10;
+    padding: 0 14px 6px 46px;
+    background: #eaf2fd;
+    display: none;
+  }
+  .edit-err.show { display: block; }
+
+  .empty-note {
+    padding: 46px 20px;
+    text-align: center; color: #999; font-size: 12px;
+  }
+  .empty-note b { color: #555; }
+
+  /* ================= BOTTOM BAR: capacity ================= */
+  .bottombar {
+    flex: none;
+    background: linear-gradient(#e8e8e8, #c8c8c8);
+    border-top: 1px solid #8a8a8a;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    padding: 9px 16px 10px;
+  }
+  .capacity {
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #7d7d7d;
+    background: linear-gradient(#c2c2c2, #e6e6e6);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.3);
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+  /* glass sheen over whole bar */
+  .capacity::after {
+    content: "";
+    position: absolute; inset: 0 0 50% 0;
+    background: linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,.12));
+    pointer-events: none;
+  }
+  .seg {
+    height: 100%;
+    min-width: 2px;
+    transition: filter .12s;
+  }
+  .seg.hover, .seg.selected { filter: brightness(1.25) saturate(1.2); }
+  .seg.free { background: linear-gradient(#dcdcdc, #bfbfbf); }
+  .seg.over { background: repeating-linear-gradient(-45deg, #e05648 0 6px, #b3251a 6px 12px); }
+
+  .capacity-caption {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #555;
+    text-shadow: 0 1px 0 rgba(255,255,255,.6);
+    padding-top: 5px;
+  }
+  .capacity-caption b { color: #222; }
+  .capacity-caption .warn { color: #a01c10; font-weight: bold; }
+
+  .footnote {
+    flex: none;
+    text-align: center;
+    padding-bottom: 8px;
+    font-size: 10px;
+    color: rgba(255,255,255,.65);
+    text-shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ MENU BAR ============ -->
+<div class="menubar" id="menubar">
+  <div class="menu">
+    <div class="menu-title apple"></div>
+    <div class="dropdown">
+      <div class="mi disabled">About This Mac</div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">System Preferences…</div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Sleep</div>
+      <div class="mi disabled">Restart…</div>
+      <div class="mi disabled">Shut Down…</div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title appname">SubscriptionKit</div>
+    <div class="dropdown">
+      <div class="mi" data-action="about">About SubscriptionKit</div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Preferences… <span class="shortcut">⌘,</span></div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Quit SubscriptionKit <span class="shortcut">⌘Q</span></div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">File</div>
+    <div class="dropdown">
+      <div class="mi" data-action="new">New Subscription <span class="shortcut">⌘N</span></div>
+      <div class="m-sep"></div>
+      <div class="mi" data-action="export">Export CSV… <span class="shortcut">⌘E</span></div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Close Window <span class="shortcut">⌘W</span></div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">Edit</div>
+    <div class="dropdown">
+      <div class="mi" data-action="edit" id="mi-edit">Edit Subscription <span class="shortcut">↩</span></div>
+      <div class="mi" data-action="delete" id="mi-delete">Delete <span class="shortcut">⌫</span></div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">View</div>
+    <div class="dropdown">
+      <div class="mi checked" data-action="display-currency" data-currency="RON">Amounts in RON</div>
+      <div class="mi" data-action="display-currency" data-currency="EUR">Amounts in EUR</div>
+      <div class="mi" data-action="display-currency" data-currency="USD">Amounts in USD</div>
+      <div class="mi" data-action="display-currency" data-currency="GBP">Amounts in GBP</div>
+      <div class="m-sep"></div>
+      <div class="mi checked" data-action="sort" data-sort="name">Sort by Name</div>
+      <div class="mi" data-action="sort" data-sort="cost">Sort by Cost</div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">Window</div>
+    <div class="dropdown">
+      <div class="mi disabled">Minimize <span class="shortcut">⌘M</span></div>
+      <div class="mi disabled">Zoom</div>
+      <div class="m-sep"></div>
+      <div class="mi checked disabled">SubscriptionKit</div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">Help</div>
+    <div class="dropdown">
+      <div class="mi" data-action="about">SubscriptionKit Help</div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="clock" id="clock"></div>
+</div>
+
+<!-- ============ WINDOW ============ -->
+<div class="window">
+  <div class="unified">
+    <div class="title-row">
+      <div class="traffic-lights">
+        <span class="light close"></span>
+        <span class="light min"></span>
+        <span class="light zoom"></span>
+      </div>
+      <div class="title">SubscriptionKit</div>
+    </div>
+    <div class="scope-row">
+      <span class="scope-label">Show:</span>
+      <div class="scope-group" id="scope-group">
+        <button class="scope active" data-scope="all">All</button>
+      </div>
+      <div class="flex"></div>
+      <div class="display-cur">Amounts in <b id="cur-indicator">RON</b></div>
+    </div>
+  </div>
+
+  <div class="list" id="list" tabindex="0"></div>
+
+  <div class="bottombar">
+    <div class="capacity" id="capacity"></div>
+    <div class="capacity-caption">
+      <span id="cap-left"></span>
+      <span id="cap-right"></span>
+    </div>
+  </div>
+</div>
+
+<div class="footnote">Mock — data in memory only. Static exchange rates. ⌘N new · ↩ edit · ⌫ delete</div>
+
+<script>
+  // Mirrors app.py constants
+  const SALARY = 3500;
+  const SALARY_CURRENCY = "RON";
+  const RATES_TO_RON = { RON: 1, EUR: 4.97, USD: 4.28, GBP: 5.86 };
+  const CURRENCIES = ["USD", "GBP", "EUR", "RON"];
+
+  // Apple-ish label palette
+  const PALETTE = ["#4a7fd4", "#58a848", "#e08c2e", "#8f63c2", "#d0545e", "#3aa8a0", "#c9a227"];
+
+  let subscriptions = [
+    { name: "Test", currency: "GBP", amount: 9.99 },
+    { name: "Netflix", currency: "EUR", amount: 12.99 },
+    { name: "iCloud+", currency: "USD", amount: 2.99 },
+    { name: "Spotify", currency: "RON", amount: 23.99 },
+    { name: "YouTube Premium", currency: "EUR", amount: 13.99 }
+  ];
+  let nextId = 0;
+  subscriptions.forEach(s => s.id = nextId++);
+
+  let displayCurrency = "RON";
+  let scope = "all";            // "all" | currency code
+  let sortMode = "name";        // "name" | "cost"
+  let selectedId = null;
+  let editingId = null;         // id being edited, or "new"
+  let hoverId = null;
+
+  const $ = id => document.getElementById(id);
+  const listEl = $("list");
+
+  const convert = (amt, from, to) => amt * RATES_TO_RON[from] / RATES_TO_RON[to];
+  const fmt = (n, cur) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + cur;
+  const colorOf = s => PALETTE[s.id % PALETTE.length];
+
+  /* ============ MENUS ============ */
+  const menus = [...document.querySelectorAll(".menu")];
+  let menuOpen = false;
+  menus.forEach(m => {
+    const title = m.querySelector(".menu-title");
+    title.addEventListener("mousedown", e => {
+      e.stopPropagation();
+      const wasOpen = m.classList.contains("open");
+      closeMenus();
+      if (!wasOpen) { m.classList.add("open"); menuOpen = true; }
+    });
+    title.addEventListener("mouseenter", () => {
+      if (menuOpen && !m.classList.contains("open")) {
+        closeMenus(); m.classList.add("open"); menuOpen = true;
+      }
+    });
+  });
+  function closeMenus() { menus.forEach(m => m.classList.remove("open")); menuOpen = false; }
+  document.addEventListener("mousedown", closeMenus);
+
+  document.querySelectorAll(".mi").forEach(mi => {
+    mi.addEventListener("mousedown", e => e.stopPropagation());
+    mi.addEventListener("click", () => {
+      if (mi.classList.contains("disabled")) return;
+      closeMenus();
+      const a = mi.dataset.action;
+      if (a === "display-currency") setDisplayCurrency(mi.dataset.currency);
+      else if (a === "sort") setSort(mi.dataset.sort);
+      else if (a === "new") startNew();
+      else if (a === "edit") startEditSelected();
+      else if (a === "delete") deleteSelected();
+      else if (a === "export") exportCSV();
+      else if (a === "about") alert("SubscriptionKit\nVersion 4.0 (Mock)\nTrack subscriptions across currencies.");
+    });
+  });
+
+  function setDisplayCurrency(cur) {
+    displayCurrency = cur;
+    document.querySelectorAll('[data-action="display-currency"]').forEach(mi =>
+      mi.classList.toggle("checked", mi.dataset.currency === cur));
+    render();
+  }
+  function setSort(mode) {
+    sortMode = mode;
+    document.querySelectorAll('[data-action="sort"]').forEach(mi =>
+      mi.classList.toggle("checked", mi.dataset.sort === mode));
+    render();
+  }
+
+  /* ============ SCOPE BAR ============ */
+  $("scope-group").addEventListener("click", e => {
+    const btn = e.target.closest(".scope");
+    if (!btn) return;
+    scope = btn.dataset.scope;
+    render();
+  });
+
+  /* ============ ACTIONS ============ */
+  function startNew() {
+    editingId = "new";
+    selectedId = null;
+    render();
+  }
+  function startEditSelected() {
+    if (selectedId === null) return;
+    editingId = selectedId;
+    render();
+  }
+  function deleteSelected() {
+    if (selectedId === null || editingId !== null) return;
+    const id = selectedId;
+    const rowEl = listEl.querySelector(`[data-id="${id}"]`);
+    const doIt = () => {
+      subscriptions = subscriptions.filter(s => s.id !== id);
+      selectedId = null;
+      render();
+    };
+    if (rowEl) { rowEl.classList.add("poof"); setTimeout(doIt, 180); }
+    else doIt();
+  }
+  function exportCSV() {
+    const lines = ["Subscription,Currency,Amount"];
+    subscriptions.forEach(s => lines.push(`${s.name},${s.currency},${s.amount}`));
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "data.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  /* ============ KEYBOARD ============ */
+  document.addEventListener("keydown", e => {
+    if (editingId !== null) return; // edit row handles its own keys
+    const cmd = e.metaKey || e.ctrlKey;
+    if (cmd && e.key.toLowerCase() === "n") { e.preventDefault(); startNew(); }
+    else if (cmd && e.key.toLowerCase() === "e") { e.preventDefault(); exportCSV(); }
+    else if (e.key === "Enter" && selectedId !== null) { e.preventDefault(); startEditSelected(); }
+    else if ((e.key === "Backspace" || e.key === "Delete") &&
+             document.activeElement.tagName !== "INPUT") {
+      e.preventDefault(); deleteSelected();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const list = visibleSubs();
+      if (!list.length) return;
+      const idx = list.findIndex(s => s.id === selectedId);
+      const next = e.key === "ArrowDown"
+        ? Math.min(idx + 1, list.length - 1)
+        : Math.max(idx - 1, 0);
+      selectedId = list[idx === -1 ? 0 : next].id;
+      render();
+    } else if (e.key === "Escape") {
+      selectedId = null; render();
+    }
+  });
+
+  /* ============ DATA VIEW ============ */
+  function visibleSubs() {
+    let list = scope === "all" ? [...subscriptions]
+      : subscriptions.filter(s => s.currency === scope);
+    list.sort((a, b) => sortMode === "cost"
+      ? convert(b.amount, b.currency, "RON") - convert(a.amount, a.currency, "RON")
+      : a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    return list;
+  }
+
+  /* ============ INLINE EDIT ROW ============ */
+  function buildEditRow(sub) {
+    const isNew = sub === null;
+    const row = document.createElement("div");
+    row.className = "lrow editing";
+
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = isNew ? "#b0b0b0" : colorOf(sub);
+    dot.textContent = isNew ? "＋" : sub.name[0].toUpperCase();
+
+    const fields = document.createElement("div");
+    fields.className = "edit-fields";
+    fields.innerHTML =
+      `<input class="e-name" type="text" placeholder="Name" value="${isNew ? "" : sub.name.replace(/"/g, "&quot;")}">` +
+      `<input class="e-amount" type="number" min="0.01" step="0.01" value="${isNew ? "9.99" : sub.amount}">` +
+      `<select class="e-currency">` +
+      CURRENCIES.map(c =>
+        `<option${(isNew ? c === "GBP" : c === sub.currency) ? " selected" : ""}>${c}</option>`).join("") +
+      `</select>`;
+
+    row.append(dot, fields);
+
+    const errEl = document.createElement("div");
+    errEl.className = "edit-err";
+
+    const nameIn = fields.querySelector(".e-name");
+    const amtIn = fields.querySelector(".e-amount");
+    const curIn = fields.querySelector(".e-currency");
+
+    function commit() {
+      const name = nameIn.value.trim();
+      const amount = parseFloat(amtIn.value);
+      const currency = curIn.value;
+      let err = null;
+      if (!name) err = "Subscription name cannot be empty.";
+      else if (!(amount > 0)) err = "Amount must be greater than 0.";
+      if (err) {
+        errEl.textContent = err;
+        errEl.classList.add("show");
+        nameIn.focus();
+        return;
+      }
+      if (isNew) {
+        const s = { id: nextId++, name, currency, amount };
+        subscriptions.push(s);
+        selectedId = s.id;
+      } else {
+        sub.name = name; sub.amount = amount; sub.currency = currency;
+        selectedId = sub.id;
+      }
+      editingId = null;
+      render();
+      listEl.focus();
+    }
+    function cancel() { editingId = null; render(); listEl.focus(); }
+
+    row.addEventListener("keydown", e => {
+      e.stopPropagation();
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      else if (e.key === "Escape") cancel();
+    });
+
+    setTimeout(() => { nameIn.focus(); nameIn.select(); }, 0);
+    return [row, errEl];
+  }
+
+  /* ============ RENDER ============ */
+  function render() {
+    $("cur-indicator").textContent = displayCurrency;
+
+    // Scope capsules from live data
+    const currenciesInUse = [...new Set(subscriptions.map(s => s.currency))].sort();
+    if (scope !== "all" && !currenciesInUse.includes(scope)) scope = "all";
+    const sg = $("scope-group");
+    sg.innerHTML = `<button class="scope${scope === "all" ? " active" : ""}" data-scope="all">All</button>` +
+      currenciesInUse.map(c =>
+        `<button class="scope${scope === c ? " active" : ""}" data-scope="${c}">${c}</button>`).join("");
+
+    // List
+    listEl.innerHTML = "";
+    const list = visibleSubs();
+
+    if (editingId === "new") {
+      const [row, err] = buildEditRow(null);
+      listEl.append(row, err);
+    }
+
+    if (!list.length && editingId !== "new") {
+      const note = document.createElement("div");
+      note.className = "empty-note";
+      note.innerHTML = subscriptions.length
+        ? "Nothing in this scope."
+        : "No subscriptions.<br>Choose <b>File → New Subscription</b> (⌘N) to add one.";
+      listEl.appendChild(note);
+    }
+
+    list.forEach(s => {
+      if (editingId === s.id) {
+        const [row, err] = buildEditRow(s);
+        listEl.append(row, err);
+        return;
+      }
+      const row = document.createElement("div");
+      row.className = "lrow";
+      row.dataset.id = s.id;
+      if (s.id === selectedId) row.classList.add("selected");
+      if (hoverId !== null && hoverId !== s.id) row.classList.add("dimmed");
+
+      const conv = convert(s.amount, s.currency, displayCurrency);
+      const pct = (convert(s.amount, s.currency, SALARY_CURRENCY) / SALARY) * 100;
+
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = colorOf(s);
+      dot.textContent = s.name[0].toUpperCase();
+
+      const info = document.createElement("div");
+      info.className = "info";
+      info.innerHTML = `<div class="name"></div><div class="meta">${pct.toFixed(1)}% of salary</div>`;
+      info.querySelector(".name").textContent = s.name;
+
+      const amounts = document.createElement("div");
+      amounts.className = "amounts";
+      amounts.innerHTML =
+        `<div class="conv">${fmt(conv, displayCurrency)}</div>` +
+        `<div class="orig">${s.currency === displayCurrency ? "&nbsp;" : fmt(s.amount, s.currency)}</div>`;
+
+      row.append(dot, info, amounts);
+      row.addEventListener("click", () => {
+        selectedId = (selectedId === s.id) ? null : s.id;
+        render();
+        listEl.focus();
+      });
+      row.addEventListener("dblclick", () => { editingId = s.id; render(); });
+      row.addEventListener("mouseenter", () => setHover(s.id));
+      row.addEventListener("mouseleave", () => setHover(null));
+      listEl.appendChild(row);
+    });
+
+    // Edit menu enablement
+    const hasSel = selectedId !== null && editingId === null;
+    $("mi-edit").classList.toggle("disabled", !hasSel);
+    $("mi-delete").classList.toggle("disabled", !hasSel);
+
+    renderCapacity();
+  }
+
+  /* iTunes-style capacity bar: one colored segment per subscription */
+  function renderCapacity() {
+    const cap = $("capacity");
+    cap.innerHTML = "";
+
+    const totalRON = subscriptions.reduce(
+      (sum, s) => sum + convert(s.amount, s.currency, SALARY_CURRENCY), 0);
+    const over = totalRON > SALARY;
+    const scale = over ? totalRON : SALARY; // if over budget, bar shows full spend
+
+    const ordered = visibleSubs().concat(
+      scope === "all" ? [] : subscriptions.filter(s => s.currency !== scope));
+
+    ordered.forEach(s => {
+      const ron = convert(s.amount, s.currency, SALARY_CURRENCY);
+      const seg = document.createElement("div");
+      seg.className = "seg";
+      seg.style.width = (ron / scale * 100) + "%";
+      seg.style.background = `linear-gradient(${colorOf(s)}, ${shade(colorOf(s), -25)})`;
+      if (s.id === hoverId || s.id === selectedId) seg.classList.add("hover");
+      seg.title = `${s.name} — ${fmt(ron, "RON")}`;
+      seg.addEventListener("mouseenter", () => setHover(s.id));
+      seg.addEventListener("mouseleave", () => setHover(null));
+      seg.addEventListener("click", () => { selectedId = s.id; render(); });
+      cap.appendChild(seg);
+    });
+
+    const freeSeg = document.createElement("div");
+    if (over) {
+      freeSeg.className = "seg over";
+      freeSeg.style.width = "0%";
+    } else {
+      freeSeg.className = "seg free";
+      freeSeg.style.width = ((SALARY - totalRON) / scale * 100) + "%";
+    }
+    cap.appendChild(freeSeg);
+
+    const totalDisp = convert(totalRON, "RON", displayCurrency);
+    const salaryDisp = convert(SALARY, SALARY_CURRENCY, displayCurrency);
+    const freeDisp = salaryDisp - totalDisp;
+    const pct = (totalRON / SALARY) * 100;
+
+    $("cap-left").innerHTML =
+      `${subscriptions.length} subscription${subscriptions.length === 1 ? "" : "s"} — ` +
+      `<b>${fmt(totalDisp, displayCurrency)}</b> of ${fmt(salaryDisp, displayCurrency)} salary (${pct.toFixed(1)}%)`;
+    $("cap-right").innerHTML = over
+      ? `<span class="warn">Over budget by ${fmt(-freeDisp, displayCurrency)}</span>`
+      : `<b>${fmt(freeDisp, displayCurrency)}</b> free`;
+  }
+
+  function setHover(id) {
+    if (hoverId === id) return;
+    hoverId = id;
+    // lightweight: only re-render highlight states
+    listEl.querySelectorAll(".lrow[data-id]").forEach(r => {
+      const rid = parseInt(r.dataset.id, 10);
+      r.classList.toggle("dimmed", hoverId !== null && rid !== hoverId);
+    });
+    renderCapacity();
+  }
+
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const c = v => Math.max(0, Math.min(255, v + amt));
+    return "#" + [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+      .map(v => c(v).toString(16).padStart(2, "0")).join("");
+  }
+
+  /* ============ CLOCK ============ */
+  function tick() {
+    const d = new Date();
+    $("clock").textContent =
+      d.toLocaleDateString(undefined, { weekday: "short" }) + " " +
+      d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  tick();
+  setInterval(tick, 30000);
+
+  render();
+</script>
+</body>
+</html>

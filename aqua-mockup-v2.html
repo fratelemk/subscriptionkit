@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubscriptionKit</title>
+<style>
+  /* ==================================================================
+     SubscriptionKit v2 — Mac OS X Panther-era desktop app mock
+     Brushed metal + source list sidebar + menus + sheet. Plain CSS/JS.
+     ================================================================== */
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: "Lucida Grande", "Lucida Sans Unicode", Geneva, Verdana, sans-serif;
+    font-size: 13px;
+    color: #000;
+    background:
+      radial-gradient(ellipse at 25% 15%, #7fb2ec 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 80%, #163f8c 0%, transparent 60%),
+      linear-gradient(155deg, #4a86d8, #2a5cb8 50%, #123c8a);
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  /* ================= MENU BAR ================= */
+  .menubar {
+    height: 22px;
+    flex: none;
+    background: linear-gradient(#fdfdfd, #e9e9e9 55%, #d6d6d6 56%, #ececec);
+    border-bottom: 1px solid #808080;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    display: flex;
+    align-items: stretch;
+    padding: 0 8px;
+    font-size: 12px;
+    position: relative;
+    z-index: 500;
+  }
+  .menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .menu > .menu-title {
+    padding: 0 10px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    cursor: default;
+    white-space: nowrap;
+  }
+  .menu > .menu-title.apple { font-size: 14px; color: #1a6ee8; padding: 0 12px; }
+  .menu > .menu-title.appname { font-weight: bold; }
+  .menu.open > .menu-title {
+    background: linear-gradient(#5c9ef5, #2565d0);
+    color: #fff;
+  }
+  .menu.open > .menu-title.apple { color: #fff; }
+
+  .dropdown {
+    display: none;
+    position: absolute;
+    top: 22px;
+    left: 0;
+    min-width: 230px;
+    background: rgba(248, 248, 248, .97);
+    border: 1px solid #9a9a9a;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.4);
+    padding: 4px 0;
+    z-index: 600;
+  }
+  .menu.open .dropdown { display: block; }
+
+  .mi {
+    padding: 3px 20px 3px 22px;
+    display: flex;
+    justify-content: space-between;
+    gap: 30px;
+    cursor: default;
+    white-space: nowrap;
+  }
+  .mi .shortcut { color: #777; }
+  .mi:hover:not(.disabled) {
+    background: linear-gradient(#5c9ef5, #2565d0);
+    color: #fff;
+  }
+  .mi:hover:not(.disabled) .shortcut { color: #dce9ff; }
+  .mi.disabled { color: #aaa; }
+  .mi.checked { position: relative; }
+  .mi.checked::before {
+    content: "✓";
+    position: absolute;
+    left: 7px;
+  }
+  .m-sep {
+    height: 1px;
+    background: #d4d4d4;
+    margin: 4px 1px;
+  }
+  .menubar .spacer { flex: 1; }
+  .menubar .clock { display: flex; align-items: center; padding: 0 8px; color: #222; }
+
+  /* ================= WINDOW (brushed metal) ================= */
+  .window {
+    flex: 1;
+    margin: 26px auto;
+    width: min(860px, calc(100vw - 48px));
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #555;
+    box-shadow: 0 14px 44px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.4);
+    position: relative;
+    min-height: 0;
+  }
+
+  /* brushed metal texture */
+  .metal {
+    background:
+      repeating-linear-gradient(90deg,
+        rgba(255,255,255,.05) 0px, rgba(0,0,0,.03) 1px,
+        rgba(255,255,255,.02) 2px, rgba(0,0,0,.02) 3px),
+      linear-gradient(#cfcfcf, #b8b8b8);
+  }
+
+  .titlebar {
+    height: 23px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    border-bottom: 1px solid #8f8f8f;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+    position: relative;
+  }
+  .traffic-lights { display: flex; gap: 8px; z-index: 2; }
+  .light {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,.35);
+    position: relative;
+  }
+  .light::after {
+    content: "";
+    position: absolute;
+    left: 2px; right: 2px; top: 1px; height: 5px;
+    border-radius: 50%;
+    background: linear-gradient(rgba(255,255,255,.95), rgba(255,255,255,.1));
+  }
+  .light.close { background: radial-gradient(circle at 50% 35%, #ff8a80, #e03e33 70%, #a91d12); }
+  .light.min   { background: radial-gradient(circle at 50% 35%, #ffe082, #e8a921 70%, #b57905); }
+  .light.zoom  { background: radial-gradient(circle at 50% 35%, #b9f6ca, #35b845 70%, #1a7a26); }
+  .titlebar .title {
+    position: absolute; left: 0; right: 0;
+    text-align: center;
+    font-size: 13px;
+    color: #333;
+    text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  }
+
+  /* ================= TOOLBAR ================= */
+  .toolbar {
+    flex: none;
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    padding: 6px 12px 5px;
+    border-bottom: 1px solid #8f8f8f;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+  }
+  .tb-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    background: none;
+    border: none;
+    font: inherit;
+    font-size: 10px;
+    color: #333;
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
+    cursor: default;
+    padding: 2px 6px;
+    border-radius: 5px;
+  }
+  .tb-btn:active:not(:disabled) { background: rgba(0,0,0,.14); }
+  .tb-btn:disabled { opacity: .4; }
+  .tb-icon {
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    border: 1px solid rgba(0,0,0,.3);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.7), 0 1px 2px rgba(0,0,0,.25);
+  }
+  .tb-icon.new    { background: linear-gradient(#d8ecc8, #7ab648 55%, #588f2c); }
+  .tb-icon.delete { background: linear-gradient(#f6d0cb, #d95f50 55%, #a93326); }
+  .tb-icon.export { background: linear-gradient(#cfe0f4, #6c9fd8 55%, #3d6fb0); }
+  .toolbar .flex { flex: 1; }
+
+  .search-wrap { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .search-field {
+    width: 170px;
+    font: inherit;
+    font-size: 12px;
+    padding: 3px 10px 3px 24px;
+    border-radius: 20px;
+    border: 1px solid #7f7f7f;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Ccircle cx='5' cy='5' r='3.5' fill='none' stroke='%23777' stroke-width='1.4'/%3E%3Cline x1='7.8' y1='7.8' x2='11' y2='11' stroke='%23777' stroke-width='1.4'/%3E%3C/svg%3E") 8px center no-repeat;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
+    outline: none;
+    user-select: text;
+  }
+  .search-field:focus { box-shadow: inset 0 1px 2px rgba(0,0,0,.2), 0 0 0 3px rgba(90,150,235,.55); }
+  .search-wrap .tb-label {
+    font-size: 10px; color: #333; text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  }
+
+  /* ================= MAIN SPLIT ================= */
+  .content {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    background: #fff;
+  }
+
+  /* Source list sidebar (iTunes style) */
+  .sidebar {
+    width: 175px;
+    flex: none;
+    background: #dce4eb;
+    border-right: 1px solid #9aa4ad;
+    padding-top: 8px;
+    overflow-y: auto;
+    font-size: 12px;
+  }
+  .side-header {
+    font-size: 10px;
+    font-weight: bold;
+    color: #7d8792;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 8px 12px 3px;
+    text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  }
+  .side-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 12px;
+    cursor: default;
+    color: #222;
+  }
+  .side-item .icon { font-size: 13px; width: 16px; text-align: center; }
+  .side-item .count {
+    margin-left: auto;
+    font-size: 10px;
+    background: #aebccb;
+    color: #fff;
+    border-radius: 8px;
+    padding: 1px 7px;
+    font-weight: bold;
+  }
+  .side-item.active {
+    background: linear-gradient(#5c9ef5, #2565d0);
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 0 1px 1px rgba(0,0,0,.3);
+  }
+  .side-item.active .count { background: rgba(255,255,255,.35); }
+
+  /* Main pane */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* Table */
+  .table-scroll { flex: 1; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th {
+    position: sticky; top: 0;
+    text-align: left;
+    font-weight: normal;
+    padding: 3px 10px;
+    background: linear-gradient(#fdfdfd, #e4e4e4 60%, #d6d6d6);
+    border-bottom: 1px solid #a0a0a0;
+    border-right: 1px solid #ccc;
+    color: #333;
+    text-shadow: 0 1px 0 rgba(255,255,255,.8);
+    cursor: default;
+    white-space: nowrap;
+  }
+  thead th:last-child { border-right: none; }
+  thead th.sorted {
+    background: linear-gradient(#c9dcf5, #a8c4e8 60%, #93b5e0);
+  }
+  thead th .arrow { font-size: 9px; margin-left: 4px; }
+  tbody td { padding: 4px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  tbody tr:nth-child(even) { background: #edf3fe; }
+  tbody tr.selected { background: linear-gradient(#5c9ef5, #2565d0); color: #fff; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  .empty-note { padding: 40px 20px; text-align: center; color: #888; font-size: 12px; }
+
+  /* Budget view */
+  .budget-view {
+    flex: 1;
+    overflow-y: auto;
+    padding: 26px 30px;
+    background: repeating-linear-gradient(180deg,
+      #f7f7f7 0px, #f7f7f7 2px, #efefef 2px, #efefef 4px);
+    display: none;
+  }
+  .budget-view h2 {
+    font-size: 16px;
+    margin-bottom: 18px;
+    text-shadow: 0 1px 0 rgba(255,255,255,.9);
+  }
+  .stat-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .stat {
+    flex: 1; min-width: 160px;
+    background: rgba(255,255,255,.85);
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 3px rgba(0,0,0,.12);
+  }
+  .stat .lbl { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .stat .val { font-size: 22px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .stat .val.negative { color: #c22; }
+  .budget-bar-label { font-size: 11px; color: #555; margin-bottom: 6px; }
+  .progress-track {
+    height: 16px;
+    border-radius: 9px;
+    border: 1px solid #8a8a8a;
+    background: linear-gradient(#dcdcdc, #f2f2f2);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.3);
+    overflow: hidden;
+    max-width: 480px;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 8px;
+    background:
+      linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,0) 45%,
+                      rgba(0,0,0,.08) 55%, rgba(255,255,255,.25)),
+      repeating-linear-gradient(-45deg,
+        #6faaf0 0, #6faaf0 9px, #3b7edd 9px, #3b7edd 18px);
+    background-size: 100% 100%, 36px 36px;
+    animation: barber 1.2s linear infinite;
+    transition: width .3s ease;
+  }
+  .progress-fill.over {
+    background:
+      linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,0) 45%,
+                      rgba(0,0,0,.08) 55%, rgba(255,255,255,.25)),
+      repeating-linear-gradient(-45deg,
+        #f08a80 0, #f08a80 9px, #d94438 9px, #d94438 18px);
+    background-size: 100% 100%, 36px 36px;
+  }
+  @keyframes barber { to { background-position: 0 0, 36px 0; } }
+
+  /* ================= STATUS BAR ================= */
+  .statusbar {
+    flex: none;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #333;
+    text-shadow: 0 1px 0 rgba(255,255,255,.5);
+    border-top: 1px solid #8f8f8f;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+  }
+  .statusbar .dot { color: #777; }
+
+  /* ================= SHEET ================= */
+  .sheet-anchor {
+    position: absolute;
+    top: 23px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 300;
+  }
+  .sheet-anchor.active { pointer-events: auto; }
+  .sheet-shade {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.12);
+    opacity: 0;
+    transition: opacity .25s;
+  }
+  .sheet-anchor.active .sheet-shade { opacity: 1; }
+  .sheet {
+    position: relative;
+    margin: 0 auto;
+    width: 400px;
+    max-width: 90%;
+    background: repeating-linear-gradient(180deg,
+      #f5f5f5 0, #f5f5f5 2px, #eaeaea 2px, #eaeaea 4px);
+    border: 1px solid #7a7a7a;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    padding: 18px 20px 16px;
+    transform: translateY(-105%);
+    transition: transform .28s cubic-bezier(.2,.8,.3,1);
+  }
+  .sheet-anchor.active .sheet { transform: translateY(0); }
+  .sheet h3 { font-size: 14px; margin-bottom: 14px; }
+  .sheet .frow { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
+  .sheet .frow label {
+    width: 110px;
+    text-align: right;
+    font-size: 12px;
+    color: #333;
+  }
+  .sheet .frow input, .sheet .frow select { flex: 1; }
+  .sheet .btn-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .sheet .err {
+    display: none;
+    font-size: 11px;
+    color: #a01c10;
+    margin: -4px 0 10px 120px;
+  }
+  .sheet .err.show { display: block; }
+
+  input[type="text"], input[type="number"] {
+    font: inherit; font-size: 13px;
+    padding: 3px 6px;
+    border: 1px solid #9a9a9a;
+    border-top-color: #6f6f6f;
+    background: #fff;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.18);
+    outline: none;
+    user-select: text;
+  }
+  select {
+    font: inherit; font-size: 12px;
+    padding: 3px 26px 3px 8px;
+    border: 1px solid #8a8a8a;
+    border-radius: 5px;
+    appearance: none; -webkit-appearance: none;
+    background-image:
+      linear-gradient(#7db4f2, #2b6cd4),
+      linear-gradient(#fdfdfd, #d8d8d8);
+    background-size: 17px 100%, 100% 100%;
+    background-position: right center, left center;
+    background-repeat: no-repeat;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 1px rgba(0,0,0,.15);
+    outline: none;
+  }
+  input:focus, select:focus {
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.15), 0 0 0 3px rgba(90,150,235,.55);
+  }
+
+  .btn {
+    font: inherit; font-size: 13px;
+    padding: 4px 18px;
+    border-radius: 12px;
+    border: 1px solid #6a6a6a;
+    background: linear-gradient(#fefefe, #d9d9d9 48%, #c8c8c8 52%, #efefef);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.9), 0 1px 2px rgba(0,0,0,.25);
+    cursor: default;
+  }
+  .btn:active { background: linear-gradient(#c5c5c5, #a8a8a8 48%, #9c9c9c 52%, #bcbcbc); }
+  .btn.primary {
+    border-color: #2b56a5;
+    color: #fff;
+    text-shadow: 0 -1px 0 rgba(0,0,0,.35);
+    background: linear-gradient(#cfe3fb 0%, #7db2f0 45%, #3b7edd 50%, #2f6ac9 80%, #6ba3ec 100%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.85), inset 0 -1px 4px rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.3);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .btn.primary:active {
+    background: linear-gradient(#8fb6e8, #4a7dc4 50%, #2a5cae 80%, #4d84cf 100%);
+    animation: none;
+  }
+  @keyframes pulse {
+    50% { filter: brightness(1.18) saturate(1.15); }
+  }
+
+  /* ================= ABOUT DIALOG ================= */
+  .about-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 700;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,.15);
+  }
+  .about-overlay.active { display: flex; }
+  .about-box {
+    width: 280px;
+    background: repeating-linear-gradient(180deg,
+      #f5f5f5 0, #f5f5f5 2px, #eaeaea 2px, #eaeaea 4px);
+    border: 1px solid #7a7a7a;
+    border-radius: 8px;
+    box-shadow: 0 14px 40px rgba(0,0,0,.5);
+    padding: 22px 20px 18px;
+    text-align: center;
+  }
+  .about-box .app-icon {
+    width: 52px; height: 52px;
+    margin: 0 auto 10px;
+    border-radius: 12px;
+    background: linear-gradient(#7db4f2, #2b6cd4 55%, #1e56b0);
+    box-shadow: inset 0 1px 2px rgba(255,255,255,.7), 0 2px 5px rgba(0,0,0,.3);
+    font-size: 28px;
+    line-height: 52px;
+    color: #fff;
+  }
+  .about-box h3 { font-size: 14px; margin-bottom: 2px; }
+  .about-box p { font-size: 10px; color: #666; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ============ MENU BAR ============ -->
+<div class="menubar" id="menubar">
+  <div class="menu">
+    <div class="menu-title apple"></div>
+    <div class="dropdown">
+      <div class="mi disabled">About This Mac</div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">System Preferences…</div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Sleep</div>
+      <div class="mi disabled">Restart…</div>
+      <div class="mi disabled">Shut Down…</div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title appname">SubscriptionKit</div>
+    <div class="dropdown">
+      <div class="mi" data-action="about">About SubscriptionKit</div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Preferences… <span class="shortcut">⌘,</span></div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Quit SubscriptionKit <span class="shortcut">⌘Q</span></div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">File</div>
+    <div class="dropdown">
+      <div class="mi" data-action="new">New Subscription… <span class="shortcut">⌘N</span></div>
+      <div class="m-sep"></div>
+      <div class="mi" data-action="import">Import CSV…</div>
+      <div class="mi" data-action="export">Export CSV… <span class="shortcut">⌘E</span></div>
+      <div class="m-sep"></div>
+      <div class="mi disabled">Close Window <span class="shortcut">⌘W</span></div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">Edit</div>
+    <div class="dropdown">
+      <div class="mi" data-action="delete" id="mi-delete">Delete Subscription <span class="shortcut">⌫</span></div>
+      <div class="m-sep"></div>
+      <div class="mi" data-action="find">Find <span class="shortcut">⌘F</span></div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">View</div>
+    <div class="dropdown">
+      <div class="mi checked" data-currency="RON" data-action="display-currency">Display in RON</div>
+      <div class="mi" data-currency="EUR" data-action="display-currency">Display in EUR</div>
+      <div class="mi" data-currency="USD" data-action="display-currency">Display in USD</div>
+      <div class="mi" data-currency="GBP" data-action="display-currency">Display in GBP</div>
+      <div class="m-sep"></div>
+      <div class="mi" data-action="show-budget">Show Budget Overview</div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">Window</div>
+    <div class="dropdown">
+      <div class="mi disabled">Minimize <span class="shortcut">⌘M</span></div>
+      <div class="mi disabled">Zoom</div>
+      <div class="m-sep"></div>
+      <div class="mi checked disabled">SubscriptionKit</div>
+    </div>
+  </div>
+
+  <div class="menu">
+    <div class="menu-title">Help</div>
+    <div class="dropdown">
+      <div class="mi" data-action="about">SubscriptionKit Help</div>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="clock" id="clock"></div>
+</div>
+
+<!-- ============ WINDOW ============ -->
+<div class="window">
+  <div class="titlebar metal">
+    <div class="traffic-lights">
+      <span class="light close"></span>
+      <span class="light min"></span>
+      <span class="light zoom"></span>
+    </div>
+    <div class="title">SubscriptionKit</div>
+  </div>
+
+  <div class="toolbar metal">
+    <button class="tb-btn" data-action="new">
+      <span class="tb-icon new">＋</span>New
+    </button>
+    <button class="tb-btn" data-action="delete" id="tb-delete" disabled>
+      <span class="tb-icon delete">🗑</span>Delete
+    </button>
+    <button class="tb-btn" data-action="export">
+      <span class="tb-icon export">⇪</span>Export
+    </button>
+    <div class="flex"></div>
+    <div class="search-wrap">
+      <input type="text" class="search-field" id="search" placeholder="">
+      <span class="tb-label">Search</span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="sidebar" id="sidebar">
+      <div class="side-header">Library</div>
+      <div class="side-item active" data-filter="all">
+        <span class="icon">📚</span> All Subscriptions <span class="count" id="count-all">0</span>
+      </div>
+      <div class="side-item" data-filter="budget">
+        <span class="icon">📊</span> Budget Overview
+      </div>
+      <div class="side-header">By Currency</div>
+      <div id="currency-items"></div>
+    </div>
+
+    <div class="main">
+      <div class="table-scroll" id="table-view">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="name">Service<span class="arrow"></span></th>
+              <th data-sort="currency">Currency<span class="arrow"></span></th>
+              <th class="num" data-sort="amount">Amount<span class="arrow"></span></th>
+              <th class="num" data-sort="converted" id="th-converted">Amount (RON)<span class="arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+        <div class="empty-note" id="empty-note" style="display:none">
+          No subscriptions. Choose File &gt; New Subscription… (⌘N) to add one.
+        </div>
+      </div>
+
+      <div class="budget-view" id="budget-view">
+        <h2>Budget Overview</h2>
+        <div class="stat-row">
+          <div class="stat">
+            <div class="lbl">Total Monthly Costs</div>
+            <div class="val" id="b-total">–</div>
+          </div>
+          <div class="stat">
+            <div class="lbl">Remaining Salary</div>
+            <div class="val" id="b-remaining">–</div>
+          </div>
+          <div class="stat">
+            <div class="lbl">% of Salary Used</div>
+            <div class="val" id="b-percent">–</div>
+          </div>
+        </div>
+        <div class="budget-bar-label" id="b-bar-label"></div>
+        <div class="progress-track">
+          <div class="progress-fill" id="b-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar metal" id="statusbar"></div>
+
+  <!-- Sheet: New Subscription -->
+  <div class="sheet-anchor" id="sheet-anchor">
+    <div class="sheet-shade"></div>
+    <div class="sheet">
+      <h3>New Subscription</h3>
+      <form id="sheet-form">
+        <div class="frow">
+          <label for="s-name">Name:</label>
+          <input type="text" id="s-name" placeholder="Netflix">
+        </div>
+        <div class="err" id="s-err"></div>
+        <div class="frow">
+          <label for="s-currency">Currency:</label>
+          <select id="s-currency">
+            <option>USD</option>
+            <option selected>GBP</option>
+            <option>EUR</option>
+            <option>RON</option>
+          </select>
+        </div>
+        <div class="frow">
+          <label for="s-amount">Monthly Amount:</label>
+          <input type="number" id="s-amount" min="0.01" step="0.01" value="9.99">
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn" id="sheet-cancel">Cancel</button>
+          <button type="submit" class="btn primary">Add</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- About dialog -->
+<div class="about-overlay" id="about-overlay">
+  <div class="about-box">
+    <div class="app-icon">💳</div>
+    <h3>SubscriptionKit</h3>
+    <p>Version 2.0 (Mock)<br>Track subscriptions across currencies.</p>
+    <button class="btn" id="about-ok">OK</button>
+  </div>
+</div>
+
+<input type="file" id="import-input" accept=".csv" style="display:none">
+
+<script>
+  // Mirrors app.py constants
+  const SALARY = 3500;
+  const SALARY_CURRENCY = "RON";
+  const RATES_TO_RON = { RON: 1, EUR: 4.97, USD: 4.28, GBP: 5.86 };
+
+  let subscriptions = [
+    { name: "Test", currency: "GBP", amount: 9.99 },
+    { name: "Netflix", currency: "EUR", amount: 12.99 },
+    { name: "iCloud+", currency: "USD", amount: 2.99 },
+    { name: "Spotify", currency: "RON", amount: 23.99 }
+  ];
+
+  let displayCurrency = "RON";
+  let filter = "all";           // "all" | "budget" | currency code
+  let selectedId = null;
+  let sortKey = "name";
+  let sortAsc = true;
+  let searchTerm = "";
+  let nextId = 0;
+  subscriptions.forEach(s => s.id = nextId++);
+
+  const $ = id => document.getElementById(id);
+
+  function convert(amount, from, to) {
+    return amount * RATES_TO_RON[from] / RATES_TO_RON[to];
+  }
+  function fmt(n, cur) { return n.toFixed(2) + " " + cur; }
+  function escapeHTML(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  /* ---------- Menus ---------- */
+  const menus = [...document.querySelectorAll(".menu")];
+  let menuOpen = false;
+  menus.forEach(m => {
+    const title = m.querySelector(".menu-title");
+    title.addEventListener("mousedown", e => {
+      e.stopPropagation();
+      const wasOpen = m.classList.contains("open");
+      closeMenus();
+      if (!wasOpen) { m.classList.add("open"); menuOpen = true; }
+    });
+    title.addEventListener("mouseenter", () => {
+      if (menuOpen && !m.classList.contains("open")) {
+        closeMenus(); m.classList.add("open"); menuOpen = true;
+      }
+    });
+  });
+  function closeMenus() {
+    menus.forEach(m => m.classList.remove("open"));
+    menuOpen = false;
+  }
+  document.addEventListener("mousedown", closeMenus);
+
+  document.querySelectorAll(".mi").forEach(mi => {
+    mi.addEventListener("mousedown", e => e.stopPropagation());
+    mi.addEventListener("click", () => {
+      if (mi.classList.contains("disabled")) return;
+      closeMenus();
+      const action = mi.dataset.action;
+      if (action === "display-currency") setDisplayCurrency(mi.dataset.currency);
+      else if (action) doAction(action);
+    });
+  });
+
+  function doAction(action) {
+    switch (action) {
+      case "new": openSheet(); break;
+      case "delete": deleteSelected(); break;
+      case "export": exportCSV(); break;
+      case "import": $("import-input").click(); break;
+      case "find": $("search").focus(); break;
+      case "about": $("about-overlay").classList.add("active"); break;
+      case "show-budget": setFilter("budget"); break;
+    }
+  }
+
+  function setDisplayCurrency(cur) {
+    displayCurrency = cur;
+    document.querySelectorAll('[data-action="display-currency"]').forEach(mi =>
+      mi.classList.toggle("checked", mi.dataset.currency === cur));
+    render();
+  }
+
+  /* ---------- Sidebar ---------- */
+  function setFilter(f) {
+    filter = f;
+    selectedId = null;
+    render();
+  }
+  $("sidebar").addEventListener("click", e => {
+    const item = e.target.closest(".side-item");
+    if (item) setFilter(item.dataset.filter);
+  });
+
+  /* ---------- Sheet ---------- */
+  function openSheet() {
+    $("s-err").classList.remove("show");
+    $("sheet-anchor").classList.add("active");
+    setTimeout(() => $("s-name").focus(), 250);
+  }
+  function closeSheet() {
+    $("sheet-anchor").classList.remove("active");
+    $("sheet-form").reset();
+  }
+  $("sheet-cancel").addEventListener("click", closeSheet);
+  $("sheet-anchor").querySelector(".sheet-shade").addEventListener("click", closeSheet);
+
+  $("sheet-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("s-name").value.trim();
+    const currency = $("s-currency").value;
+    const amount = parseFloat($("s-amount").value);
+
+    let err = null;
+    if (!name) err = "Subscription name cannot be empty.";
+    else if (!currency) err = "Please select a currency.";
+    else if (!(amount > 0)) err = "Amount must be greater than 0.";
+    if (err) {
+      const el = $("s-err");
+      el.textContent = err;
+      el.classList.add("show");
+      return;
+    }
+
+    subscriptions.push({ id: nextId++, name, currency, amount });
+    closeSheet();
+    render();
+  });
+
+  /* ---------- Delete ---------- */
+  function deleteSelected() {
+    if (selectedId === null) return;
+    subscriptions = subscriptions.filter(s => s.id !== selectedId);
+    selectedId = null;
+    render();
+  }
+
+  /* ---------- Export / Import ---------- */
+  function exportCSV() {
+    const lines = ["Subscription,Currency,Amount"];
+    subscriptions.forEach(s => lines.push(`${s.name},${s.currency},${s.amount}`));
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "data.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  $("import-input").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = reader.result.split(/\r?\n/).filter(Boolean);
+      rows.slice(1).forEach(row => {
+        const [name, currency, amount] = row.split(",");
+        const amt = parseFloat(amount);
+        if (name && RATES_TO_RON[currency] && amt > 0) {
+          subscriptions.push({ id: nextId++, name: name.trim(), currency, amount: amt });
+        }
+      });
+      render();
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  /* ---------- Sorting ---------- */
+  document.querySelectorAll("thead th").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sort;
+      if (sortKey === key) sortAsc = !sortAsc;
+      else { sortKey = key; sortAsc = true; }
+      render();
+    });
+  });
+
+  /* ---------- Search ---------- */
+  $("search").addEventListener("input", e => {
+    searchTerm = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  /* ---------- Keyboard shortcuts ---------- */
+  document.addEventListener("keydown", e => {
+    const sheetOpen = $("sheet-anchor").classList.contains("active");
+    if (e.key === "Escape") {
+      if (sheetOpen) closeSheet();
+      closeMenus();
+      return;
+    }
+    if (sheetOpen) return;
+    const cmd = e.metaKey || e.ctrlKey;
+    if (cmd && e.key.toLowerCase() === "n") { e.preventDefault(); openSheet(); }
+    else if (cmd && e.key.toLowerCase() === "e") { e.preventDefault(); exportCSV(); }
+    else if (cmd && e.key.toLowerCase() === "f") { e.preventDefault(); $("search").focus(); }
+    else if ((e.key === "Backspace" || e.key === "Delete") &&
+             document.activeElement.tagName !== "INPUT") {
+      e.preventDefault();
+      deleteSelected();
+    }
+  });
+
+  /* ---------- Toolbar ---------- */
+  document.querySelectorAll(".tb-btn").forEach(btn =>
+    btn.addEventListener("click", () => doAction(btn.dataset.action)));
+
+  /* ---------- About ---------- */
+  $("about-ok").addEventListener("click", () =>
+    $("about-overlay").classList.remove("active"));
+
+  /* ---------- Render ---------- */
+  function visibleSubs() {
+    let list = subscriptions;
+    if (filter !== "all" && filter !== "budget") {
+      list = list.filter(s => s.currency === filter);
+    }
+    if (searchTerm) {
+      list = list.filter(s => s.name.toLowerCase().includes(searchTerm));
+    }
+    const dir = sortAsc ? 1 : -1;
+    return [...list].sort((a, b) => {
+      let va, vb;
+      switch (sortKey) {
+        case "amount": va = a.amount; vb = b.amount; break;
+        case "converted":
+          va = convert(a.amount, a.currency, displayCurrency);
+          vb = convert(b.amount, b.currency, displayCurrency);
+          break;
+        case "currency": va = a.currency; vb = b.currency; break;
+        default: va = a.name.toLowerCase(); vb = b.name.toLowerCase();
+      }
+      return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+    });
+  }
+
+  function render() {
+    const budgetMode = filter === "budget";
+    $("table-view").style.display = budgetMode ? "none" : "block";
+    $("budget-view").style.display = budgetMode ? "block" : "none";
+
+    // Sidebar
+    document.querySelectorAll(".side-item").forEach(item =>
+      item.classList.toggle("active", item.dataset.filter === filter));
+    $("count-all").textContent = subscriptions.length;
+
+    const byCurrency = {};
+    subscriptions.forEach(s => byCurrency[s.currency] = (byCurrency[s.currency] || 0) + 1);
+    const ci = $("currency-items");
+    ci.innerHTML = "";
+    Object.keys(byCurrency).sort().forEach(cur => {
+      const div = document.createElement("div");
+      div.className = "side-item" + (filter === cur ? " active" : "");
+      div.dataset.filter = cur;
+      div.innerHTML = `<span class="icon">💱</span> ${cur} <span class="count">${byCurrency[cur]}</span>`;
+      ci.appendChild(div);
+    });
+
+    // Table
+    $("th-converted").firstChild.textContent = `Amount (${displayCurrency})`;
+    document.querySelectorAll("thead th").forEach(th => {
+      const active = th.dataset.sort === sortKey;
+      th.classList.toggle("sorted", active);
+      th.querySelector(".arrow").textContent = active ? (sortAsc ? "▲" : "▼") : "";
+    });
+
+    const list = visibleSubs();
+    const tbody = $("table-body");
+    tbody.innerHTML = "";
+    list.forEach(s => {
+      const tr = document.createElement("tr");
+      if (s.id === selectedId) tr.classList.add("selected");
+      const conv = convert(s.amount, s.currency, displayCurrency);
+      tr.innerHTML =
+        `<td>${escapeHTML(s.name)}</td>` +
+        `<td>${s.currency}</td>` +
+        `<td class="num">${s.amount.toFixed(2)}</td>` +
+        `<td class="num">${fmt(conv, displayCurrency)}</td>`;
+      tr.addEventListener("click", () => {
+        selectedId = (selectedId === s.id) ? null : s.id;
+        render();
+      });
+      tbody.appendChild(tr);
+    });
+    $("empty-note").style.display =
+      (!budgetMode && list.length === 0) ? "block" : "none";
+
+    // Delete enablement
+    const hasSel = selectedId !== null;
+    $("tb-delete").disabled = !hasSel;
+    $("mi-delete").classList.toggle("disabled", !hasSel);
+
+    // Totals (always across ALL subscriptions, like app.py)
+    const total = subscriptions.reduce(
+      (sum, s) => sum + convert(s.amount, s.currency, displayCurrency), 0);
+    const salaryConv = convert(SALARY, SALARY_CURRENCY, displayCurrency);
+    const remaining = salaryConv - total;
+    const percent = salaryConv > 0 ? (total / salaryConv) * 100 : 0;
+
+    // Status bar
+    $("statusbar").innerHTML =
+      `${subscriptions.length} subscription${subscriptions.length === 1 ? "" : "s"}` +
+      ` <span class="dot">•</span> ${fmt(total, displayCurrency)} / month` +
+      ` <span class="dot">•</span> ${percent.toFixed(1)}% of salary`;
+
+    // Budget view
+    $("b-total").textContent = fmt(total, displayCurrency);
+    const rem = $("b-remaining");
+    rem.textContent = fmt(remaining, displayCurrency);
+    rem.classList.toggle("negative", remaining < 0);
+    $("b-percent").textContent = percent.toFixed(1) + "%";
+    $("b-bar-label").textContent =
+      `Salary usage — ${fmt(total, displayCurrency)} of ${fmt(salaryConv, displayCurrency)}`;
+    const bar = $("b-bar");
+    bar.style.width = Math.min(percent, 100) + "%";
+    bar.classList.toggle("over", percent > 100);
+  }
+
+  /* ---------- Clock ---------- */
+  function tick() {
+    const d = new Date();
+    $("clock").textContent =
+      d.toLocaleDateString(undefined, { weekday: "short" }) + " " +
+      d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  tick();
+  setInterval(tick, 30000);
+
+  render();
+</script>
+</body>
+</html>
